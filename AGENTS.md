@@ -1,16 +1,12 @@
-# AGENTS.md — py-opencode-scaffold
+# AGENTS.md — PINNs-Piezo-Direct_Indirect
 
-## Template lifecycle
+## Project
 
-- **MUST** update project name and description in this file when creating a new project from this template.
-- Resolve the black/ruff formatter conflict: Ruff is the VS Code default formatter (`charliermarsh.ruff`); `black` in `requirements.txt` is redundant and should be removed.
-- Add a `pyproject.toml` if your project needs one — the template ships without package configuration by design.
+Physics-Informed Neural Networks (PINNs) applied to a 2D piezoelectric beam problem. Two formulations:
+- **Indirect (voltage-driven)** — potential imposed across electrodes, beam deformation predicted
+- **Direct (force-driven)** — traction at the beam tip, electric potential recovered
 
-## Starting point
-
-- `src/` and `tests/` directories do not exist — create them as you add code.
-- No `pyproject.toml`, `setup.py`, or `setup.cfg` — configure your tooling (mypy, pytest, ruff) as you go.
-- OpenCode reads this file automatically on every session; keep it current.
+Source code lives in `src/pinn_piezo/` with scripts in `scripts/`.
 
 ## Pre-installed tooling
 
@@ -27,7 +23,23 @@
 ### Dependencies
 
 ```bash
-pip install <package> && pip freeze > requirements.txt
+pip install -e . && pip freeze > requirements.txt
+```
+
+### Training
+
+```bash
+python -m scripts.run_all                                              # full pipeline
+python -m scripts.generate_geometry                                    # generate data
+python -m scripts.train_indirect                                       # train indirect
+python -m scripts.train_direct                                         # train direct
+```
+
+### Evaluation
+
+```bash
+python -m scripts.evaluate --formulation indirect --state models/indirect/model_PINN_indirect_paper_3.pt
+python -m scripts.evaluate --formulation direct --state models/direct/model_PINN_direct_paper_3.pt
 ```
 
 ### Testing

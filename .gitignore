@@ -60,3 +60,22 @@ Thumbs.db
 # Skills CLI artifacts
 .agents/
 skills-lock.json
+
+# Environment version files
+.python-version
+
+# Generated geometry / collocation datasets
+data/*.npy
+data/*.csv
+
+# Per-run training / evaluation artefacts
+outputs/runs/
+
+# Experiment tracking
+mlruns/
+
+# Reviewer-revision generated artefacts
+outputs/revision/
+
+# NOTE: models/ is intentionally NOT ignored — it contains
+# the pre-trained weights reported in the paper.

@@ -1,15 +1,13 @@
-# py-opencode-scaffold
-
-[![Open in GitHub Codespaces](https://img.shields.io/badge/Open%20in-Codespaces-2088FF?style=for-the-badge&logo=github)](https://codespaces.new/crias-solutions/py-opencode-scaffold)
-[![License: MPL 2.0](https://img.shields.io/badge/License-MPL%202.0-F77F00?style=for-the-badge&logo=mozilla)](https://opensource.org/licenses/MPL-2.0)
+# PINNs-Piezo-Direct_Indirect
 
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
-[![Node.js](https://img.shields.io/badge/Node.js-20-339933?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org/)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.0-EE4C2C?style=flat-square&logo=pytorch&logoColor=white)](https://pytorch.org/)
+[![License: MPL 2.0](https://img.shields.io/badge/License-MPL%202.0-F77F00?style=flat-square&logo=mozilla)](https://opensource.org/licenses/MPL-2.0)
 [![OpenCode](https://img.shields.io/badge/OpenCode-CLI-8B5CF6?style=flat-square&logo=openai&logoColor=white)](https://opencode.ai/)
 
 ---
 
-A ready-to-use Python development environment template for GitHub Codespaces with OpenCode AI assistant pre-configured. Create your own copy, launch a Codespace, and start coding with AI assistance in minutes.
+Physics-Informed Neural Networks (PINNs) applied to a 2D piezoelectric beam problem. Two complementary formulations are implemented: an **indirect (voltage-driven)** formulation where a potential difference produces beam deformation, and a **direct (force-driven)** formulation where a mechanical load generates an electric potential.
 
 ---
 
@@ -17,15 +15,15 @@ A ready-to-use Python development environment template for GitHub Codespaces wit
 
 ### Problem
 
-Developers spend significant time setting up local development environments. Installing tools, configuring extensions, and ensuring consistency across machines slows down productivity.
+Simulating piezoelectric beams requires solving coupled mechanical and electrostatic PDEs. Traditional FEM methods are accurate but computationally expensive for design-space exploration and inverse problems.
 
 ### Motivation
 
-This template eliminates manual setup. It provides a pre-configured Codespace with Python, Node.js, and OpenCode ready to use immediately after launch.
+PINNs embed the governing physics directly into the neural network loss function, eliminating mesh generation and providing a differentiable surrogate that can be evaluated anywhere in the domain at negligible cost.
 
 ### Intended Impact
 
-Reduce environment setup from hours to minutes. Enable developers to focus on writing code rather than configuring tools.
+Provide a reproducible, mesh-free framework for piezoelectric beam simulation that achieves competitive accuracy with FEM while enabling rapid prototyping and gradient-based optimization.
 
 ---
 
@@ -33,219 +31,138 @@ Reduce environment setup from hours to minutes. Enable developers to focus on wr
 
 ### Architecture
 
-The project uses GitHub Codespaces with a DevContainer configuration. This provides a consistent, containerized development environment that runs in the cloud.
+The network predicts all primal fields — displacement *(u, v)*, electric potential *(phi)*, stress *(sigmax, sigmaz, tauxz)*, and electric displacement *(Dx, Dy)* — as direct outputs. Hard boundary constraints are enforced via **distance functions** in the network's forward pass, reducing the PDE order from 2nd to 1st.
 
-### Technical Approach
+### Two Formulations
 
-1. **DevContainer** – Defines the development environment with all required tools and extensions
-2. **Template Repository** – Users create their own copy from this template
-3. **Environment Variables** – API keys are configured via GitHub Codespaces secrets
+| Formulation | Input | Output | Key File |
+|---|---|---|---|
+| Indirect | Voltage across electrodes | Beam deformation | `src/pinn_piezo/indirect/` |
+| Direct | Traction at right end | Electric potential | `src/pinn_piezo/direct/` |
 
-### Key Components
+### Training
 
-- Python 3.12 for runtime
-- Node.js 20 for CLI tools
-- OpenCode CLI for AI assistance
-- GSD (Get Shit Done) for structured AI workflows
-- spec-kit for specification-first development
-- VS Code extensions pre-configured
-- Skill Finder (find-skills) for discovering and installing community skills
+A two-stage optimizer pipeline:
+1. **Adam** — adaptive momentum for stable initial convergence
+2. **L-BFGS** — quasi-Newton refinement to polish the solution
+
+Adaptive loss weighting via gradient norm balancing (moving average alpha = 0.9).
 
 ---
 
 ## What
 
-### Core Features
+### Repository Layout
 
-1. **One-click Codespace setup** – Launch a fully configured environment from the template
-2. **Pre-configured AI assistance** – OpenCode ready to use with `/help` command
-3. **Skill discovery** – `find-skills` for discovering and installing community skills
-4. **Structured AI workflows** – GSD provides plan/execute/verify commands out of the box
-5. **Specification-first development** – spec-kit for constitution, specs, plans, and tasks
-6. **Customizable context** – AGENTS.md template for project-specific instructions
+```
+src/pinn_piezo/
+    config.py            # geometric constants and configurable paths
+    materials.py         # piezoelectric material coefficients
+    geometry.py          # boundary / collocation point sampling
+    plotting.py          # shared matplotlib helpers
+    evaluation.py        # FEM ground-truth comparison
+    indirect/
+        model.py         # FCNPyramid / FCNUniform with hard constraints
+        losses.py        # physics + boundary losses (voltage-driven)
+        train.py         # Adam + L-BFGS training driver
+    direct/
+        model.py         # FCN with hard constraints
+        losses.py        # physics + boundary losses (force-driven)
+        train.py         # Adam (+ optional L-BFGS) training driver
 
-### What's Included
+scripts/
+    generate_geometry.py # create .npy data files
+    train_indirect.py    # train the indirect formulation
+    train_direct.py      # train the direct formulation
+    evaluate.py          # field plots and FEM comparison
+    run_all.py           # full pipeline: data -> train -> evaluate
 
-- DevContainer configuration
-- AGENTS.md template for OpenCode context with prompting and workflow best practices
-- Python dependencies (requirements.txt)
-- Git configuration (.gitattributes, .gitignore)
-- Skill Finder (find-skills) and two pre-installed skills (`design-md`, `review-code`)
+notebooks/               # original Colab notebooks (reference only)
+models/                  # paper-quality trained weights (committed)
+data/                    # .npy / FEM.csv files (generated)
+outputs/
+    runs/<run_name>/     # one self-contained directory per invocation
+```
+
+All scripts write artefacts into `outputs/runs/<run_name>/`.
+
+### Pre-trained Models
+
+Two checkpoints are committed and correspond to the paper results:
+- `models/indirect/model_PINN_indirect_paper_3.pt`
+- `models/direct/model_PINN_direct_paper_3.pt`
 
 ---
 
 ## Installation
 
-1. Click **"Use this template"** → **"Create a new repository"**
-2. Name your project and choose visibility (public/private)
-3. Click **"Create repository"**
-4. In your new repo, click the **"Open in Codespaces"** badge
-5. Wait for the environment to build (~2 minutes)
-6. Open terminal and run:
-   ```bash
-   opencode
-   ```
-7. Start coding with AI assistance
+### With `uv` (recommended)
 
----
+```bash
+uv venv
+source .venv/bin/activate
+uv pip install -r requirements.txt
+uv pip install -e .
+```
 
-## Configuration
+### With `pip` and `venv`
 
-### API Keys Setup
-
-OpenCode requires an API key from a supported provider.
-
-#### Option 1: Anthropic (Claude)
-
-1. Get your API key from [console.anthropic.com](https://console.anthropic.com/)
-2. In GitHub, go to **Settings** → **Codespaces** → **Secrets**
-3. Click **New secret**:
-   - Name: `ANTHROPIC_API_KEY`
-   - Value: Your API key
-4. Rebuild your Codespace
-
-#### Option 2: OpenAI (GPT)
-
-1. Get your API key from [platform.openai.com](https://platform.openai.com/)
-2. In GitHub, go to **Settings** → **Codespaces** → **Secrets**
-3. Click **New secret**:
-   - Name: `OPENAI_API_KEY`
-   - Value: Your API key
-4. Rebuild your Codespace
-
----
-
-## Models
-
-OpenCode supports multiple AI providers. Choose based on your needs:
-
-| Model | Provider | Best For |
-|-------|----------|----------|
-| Claude 3.5 Sonnet | Anthropic | General coding, debugging, explanations |
-| Claude 3 Opus | Anthropic | Complex reasoning, large codebases |
-| GPT-4o | OpenAI | Fast responses, broad knowledge |
-| GPT-4 Turbo | OpenAI | Cost-effective coding tasks |
-
-### Selecting a Model
-
-OpenCode automatically uses the model associated with your configured API key. Set either `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` in your Codespaces secrets.
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+pip install -e .
+```
 
 ---
 
 ## Usage
 
-### Launch OpenCode
+### Full Pipeline
 
 ```bash
-opencode
+python -m scripts.run_all
 ```
 
-### Common Commands
-
-| Command | Description |
-|---------|-------------|
-| `opencode` | Launch AI assistant |
-| `/help` | Show available commands |
-| `/clear` | Clear conversation |
-| `/quit` | Exit OpenCode |
-
-### Typical Workflow
-
-1. Run `opencode` in terminal
-2. Describe what you want to build
-3. AI assists with coding, debugging, and explaining
-
----
-
-## Project Structure
-
-```
-py-opencode-scaffold/
-├── .devcontainer/
-│   └── devcontainer.json        # Codespaces configuration
-├── .opencode/
-│   └── skills/
-│       ├── design-md/
-│       │   └── SKILL.md         # DESIGN.md scaffolding skill
-│       └── review-code/
-│           └── SKILL.md         # Code review skill
-├── .gitattributes               # Git file handling rules
-├── .gitignore                   # Ignored files and folders
-├── AGENTS.md                    # AI context template
-├── DESIGN.md                    # Visual design system template
-├── LICENSE                      # MPL 2.0
-├── README.md                    # This file
-├── requirements.txt             # Python dependencies
-└── WRITING.md                   # Documentation standards
-```
-
----
-
-## AI Context Files
-
-This template includes files that help OpenCode understand your project:
-
-### AGENTS.md
-
-**Purpose**: Provides context about your project to OpenCode. Includes best practices for context management, verification workflows, and prompting.
-
-**When to use**:
-- When you create a new project from this template
-- When your project evolves (new tech stack, conventions, dependencies)
-- When you need OpenCode to follow specific coding standards
-
-**How to use**: Edit [AGENTS.md](AGENTS.md) to describe:
-- Project name and description
-- Tech stack and dependencies
-- Coding standards and conventions
-- Common tasks and commands
-
-### WRITING.md
-
-**Purpose**: Defines documentation standards for this project.
-
-**When to use**:
-- When creating or updating README.md files
-- When writing any project documentation
-- When ensuring consistency across documentation
-
-**How to use**: OpenCode automatically reads WRITING.md when modifying documentation. It enforces:
-- Golden Circle structure (Why → How → What)
-- Rule of Three for content organization
-- KISS principle for clarity
-
-### DESIGN.md
-
-**Purpose**: Defines the visual design system so AI agents generate consistent UI.
-
-**When to use**:
-- When you have established brand colors, typography, or component patterns
-- When you want AI-generated UI to match your project's visual identity
-- When using AI agents for frontend or design work
-
-**How to use**: Edit [DESIGN.md](DESIGN.md) to define colors, typography, spacing, components, shapes, and design rules following the [Google Stitch format](https://stitch.withgoogle.com/docs/design-md/specification/). OpenCode's `design-md` skill can scaffold this file for you.
-
----
-
-## Skills
-
-This template ships with two pre-installed skills in `.opencode/skills/`:
-
-| Skill | File | Purpose |
-|---|---|---|
-| `design-md` | `.opencode/skills/design-md/SKILL.md` | Scaffold a DESIGN.md using the Google Stitch format |
-| `review-code` | `.opencode/skills/review-code/SKILL.md` | Review the current diff for bugs and edge cases |
-
-### Discover More Skills
-
-Install the [find-skills](https://github.com/vercel-labs/skills) tool to search the community skill registry:
+Train specific formulations:
 
 ```bash
-npx skills add https://github.com/vercel-labs/skills --skill find-skills
-npx skills find <keyword>
+python -m scripts.run_all --formulations indirect
+python -m scripts.run_all --formulations direct
 ```
 
-Browse all available skills at [skills.sh](https://skills.sh/).
+Use pre-trained weights (skip training, regenerate figures):
+
+```bash
+python -m scripts.run_all --use-pretrained --skip-data
+```
+
+### Individual Steps
+
+```bash
+# 1. Generate geometry datasets
+python -m scripts.generate_geometry
+
+# 2. Train
+python -m scripts.train_indirect
+python -m scripts.train_direct
+
+# 3. Evaluate
+python -m scripts.evaluate \
+    --formulation indirect \
+    --state models/indirect/model_PINN_indirect_paper_3.pt
+```
+
+### Configurable Paths
+
+Set these environment variables to override default paths:
+
+| Variable | Default |
+|---|---|
+| `PINN_PIEZO_DATA_DIR` | `<repo>/data` |
+| `PINN_PIEZO_MODELS_DIR` | `<repo>/models` |
+| `PINN_PIEZO_OUTPUTS_DIR` | `<repo>/outputs` |
 
 ---
 
@@ -260,8 +177,4 @@ See the [LICENSE](LICENSE) file for full details.
 
 ## Acknowledgments
 
-This template includes the following third-party tools:
-
-- **[GSD (Get Shit Done)](https://github.com/gsd-build/get-shit-done)** — Developed by [TACHES](https://github.com/gsd-build/get-shit-done) under the MIT License. Copyright (c) 2025 Lex Christopherson. See the [GSD LICENSE](https://github.com/gsd-build/get-shit-done/blob/main/LICENSE) for full details.
-
-- **[spec-kit](https://github.com/github/spec-kit)** — Developed by [GitHub](https://github.com/github/spec-kit) under the MIT License. Copyright (c) GitHub, Inc. See the [spec-kit LICENSE](https://github.com/github/spec-kit/blob/main/LICENSE) for full details.
+This repository builds on the original work by Daniel Gonzalez ([PINNs_piezoelectricity](https://github.com/Daniel14gonc/PINNs_piezoelectricity)) and the `py-opencode-scaffold` development environment template.
