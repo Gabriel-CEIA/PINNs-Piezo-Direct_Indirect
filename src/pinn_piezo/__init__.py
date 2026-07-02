@@ -16,5 +16,6 @@ from . import materials
 from . import geometry
 from . import plotting
 from . import evaluation
+from . import experiment
 
-__all__ = ["config", "materials", "geometry", "plotting", "evaluation"]
+__all__ = ["config", "materials", "geometry", "plotting", "evaluation", "experiment"]

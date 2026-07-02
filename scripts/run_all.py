@@ -7,8 +7,8 @@ is self-contained and reproducible.
 
 Usage:
     python -m scripts.run_all                           # both formulations
-    python -m scripts.run_all --formulations indirect
-    python -m scripts.run_all --skip-data --use-pretrained
+    python -m scripts.run_all --config-indirect config_indirect.yaml
+    python -m scripts.run_all --use-pretrained
 """
 
 from __future__ import annotations
@@ -27,6 +27,7 @@ from pinn_piezo import evaluation, geometry, plotting
 from pinn_piezo.config import (
     DATA_DIR, MODELS_DIR, OUTPUTS_DIR, get_device,
 )
+from pinn_piezo.experiment import ExperimentConfig
 
 
 def parse_args():
@@ -36,6 +37,10 @@ def parse_args():
                    default=["indirect", "direct"])
     p.add_argument("--run-name", type=str, default=None,
                    help="Optional run identifier (defaults to a timestamp).")
+    p.add_argument("--config-indirect", type=str, default=None,
+                   help="Path to indirect YAML config.")
+    p.add_argument("--config-direct", type=str, default=None,
+                   help="Path to direct YAML config.")
 
     # Geometry
     p.add_argument("--n-points", type=int, default=400)
@@ -77,6 +82,36 @@ def _resolve_run_dir(name: str | None) -> Path:
     return run_dir
 
 
+def _load_config(path: str | None, default_formulation: str) -> ExperimentConfig:
+    if path:
+        config = ExperimentConfig.load(path)
+    elif default_formulation == "indirect":
+        config = ExperimentConfig.default_indirect()
+    else:
+        config = ExperimentConfig.default_direct()
+    return config
+
+
+def _apply_cli_overrides(config: ExperimentConfig, args, formulation: str):
+    if formulation == "indirect":
+        if args.epochs_adam_indirect != 1000:
+            config.training.epochs_adam = args.epochs_adam_indirect
+        if args.epochs_lbfgs_indirect != 200:
+            config.training.epochs_lbfgs = args.epochs_lbfgs_indirect
+    else:
+        if args.epochs_adam_direct != 3000:
+            config.training.epochs_adam = args.epochs_adam_direct
+        if args.epochs_lbfgs_direct != 0:
+            config.training.epochs_lbfgs = args.epochs_lbfgs_direct
+    if args.n_points != 400:
+        config.geometry.n_points = args.n_points
+    if args.n_collocation != 150:
+        config.geometry.n_collocation = args.n_collocation
+    if args.n_collocation_test != 200:
+        config.geometry.n_collocation_test = args.n_collocation_test
+    config.run.seed = config.run.seed or args.seed
+
+
 def _generate_data(args, suffixes):
     print(f"\n[1/3] Generating geometry datasets: {suffixes}")
     for suffix in suffixes:
@@ -89,27 +124,35 @@ def _generate_data(args, suffixes):
         )
 
 
-def _train_indirect(args, run_dir: Path):
-    from pinn_piezo.indirect import model as model_mod
-    from pinn_piezo.indirect import train as train_mod
+def _train_indirect(args, config: ExperimentConfig, run_dir: Path):
+    from pinn_piezo.indirect import model as ind_model
+    from pinn_piezo.indirect import train as ind_train
 
     torch.set_default_dtype(torch.float64)
     device = get_device()
     print(f"  device={device}")
 
-    model = model_mod.build_default_model(device=device)
-    arrays = train_mod.load_dataset(DATA_DIR, suffix="_m1", fraction=1.0)
-    tensors = train_mod.to_device(arrays, device, dtype=torch.float64)
+    model = ind_model.build_default_model(
+        device=device,
+        model_type=config.arch.model_type,
+        hidden_sizes=tuple(config.arch.hidden_sizes),
+    )
+    arrays = ind_train.load_dataset(
+        DATA_DIR,
+        suffix=config.training.data_suffix,
+        fraction=config.training.data_fraction,
+    )
+    tensors = ind_train.to_device(arrays, device, dtype=torch.float64)
 
     ckpt_adam = run_dir / "checkpoints" / "indirect_ADAM"
     ckpt_lbfgs = run_dir / "checkpoints" / "indirect_LBFGS"
     ckpt_adam.mkdir(parents=True, exist_ok=True)
     ckpt_lbfgs.mkdir(parents=True, exist_ok=True)
 
-    result = train_mod.train(
+    result = ind_train.train(
         model, tensors,
-        epochs_adam=args.epochs_adam_indirect,
-        epochs_lbfgs=args.epochs_lbfgs_indirect,
+        epochs_adam=config.training.epochs_adam,
+        epochs_lbfgs=config.training.epochs_lbfgs,
         checkpoints_adam_dir=ckpt_adam,
         checkpoints_lbfgs_dir=ckpt_lbfgs,
     )
@@ -120,25 +163,52 @@ def _train_indirect(args, run_dir: Path):
     plotting.plot_loss_curve(result["loss_list"], save=True,
                              save_dir=run_dir / "figures",
                              filename="loss_indirect.png", show=False)
+
+    ch = result.get("component_history")
+    if ch:
+        plotting.plot_component_losses(
+            result["loss_list"], ch.get("pde", []), ch.get("bc", []),
+            save_dir=run_dir / "figures",
+            filename="component_losses_indirect.png",
+        )
+        plotting.plot_weight_evolution(
+            ch.get("lambda_pde", []), ch.get("lambda_bc", []),
+            save_dir=run_dir / "figures",
+            filename="weight_evolution_indirect.png",
+        )
+        plotting.plot_training_dashboard(
+            result["loss_list"], ch.get("pde", []), ch.get("bc", []),
+            ch.get("lambda_pde", []), ch.get("lambda_bc", []),
+            save_dir=run_dir / "figures",
+            filename="training_dashboard_indirect.png",
+        )
+
     return model, weights_path, result
 
 
-def _train_direct(args, run_dir: Path):
-    from pinn_piezo.direct import model as model_mod
-    from pinn_piezo.direct import train as train_mod
+def _train_direct(args, config: ExperimentConfig, run_dir: Path):
+    from pinn_piezo.direct import model as dir_model
+    from pinn_piezo.direct import train as dir_train
 
     torch.set_default_dtype(torch.float32)
     device = get_device()
     print(f"  device={device}")
 
-    model = model_mod.build_default_model(device=device)
-    arrays = train_mod.load_dataset(DATA_DIR, suffix="_m1_d", fraction=0.75)
-    tensors = train_mod.to_device(arrays, device, dtype=torch.float32)
+    model = dir_model.build_default_model(
+        device=device,
+        hidden_sizes=tuple(config.arch.hidden_sizes),
+    )
+    arrays = dir_train.load_dataset(
+        DATA_DIR,
+        suffix=config.training.data_suffix,
+        fraction=config.training.data_fraction,
+    )
+    tensors = dir_train.to_device(arrays, device, dtype=torch.float32)
 
-    result = train_mod.train(
+    result = dir_train.train(
         model, tensors,
-        epochs_adam=args.epochs_adam_direct,
-        epochs_lbfgs=args.epochs_lbfgs_direct,
+        epochs_adam=config.training.epochs_adam,
+        epochs_lbfgs=config.training.epochs_lbfgs,
     )
 
     weights_path = run_dir / "models" / "model_PINN_direct.pt"
@@ -147,20 +217,41 @@ def _train_direct(args, run_dir: Path):
     plotting.plot_loss_curve(result["loss_list"], save=True,
                              save_dir=run_dir / "figures",
                              filename="loss_direct.png", show=False)
+
+    ch = result.get("component_history")
+    if ch:
+        plotting.plot_component_losses(
+            result["loss_list"], ch.get("pde", []), ch.get("bc", []),
+            save_dir=run_dir / "figures",
+            filename="component_losses_direct.png",
+        )
+        plotting.plot_weight_evolution(
+            ch.get("lambda_pde", []), ch.get("lambda_bc", []),
+            save_dir=run_dir / "figures",
+            filename="weight_evolution_direct.png",
+        )
+        plotting.plot_training_dashboard(
+            result["loss_list"], ch.get("pde", []), ch.get("bc", []),
+            ch.get("lambda_pde", []), ch.get("lambda_bc", []),
+            save_dir=run_dir / "figures",
+            filename="training_dashboard_direct.png",
+        )
+
     return model, weights_path, result
 
 
 def _load_pretrained(formulation: str, run_dir: Path):
     if formulation == "indirect":
-        from pinn_piezo.indirect import model as model_mod
+        from pinn_piezo.indirect import model as ind_model
         torch.set_default_dtype(torch.float64)
         src = MODELS_DIR / "indirect" / "model_PINN_indirect_paper_3.pt"
     else:
-        from pinn_piezo.direct import model as model_mod
+        from pinn_piezo.direct import model as dir_model
         torch.set_default_dtype(torch.float32)
         src = MODELS_DIR / "direct" / "model_PINN_direct_paper_3.pt"
 
     device = get_device()
+    model_mod = ind_model if formulation == "indirect" else dir_model
     model = model_mod.build_default_model(device=device)
     model.load_state_dict(torch.load(src, map_location=device))
 
@@ -269,16 +360,25 @@ def _evaluate(formulation: str, model, run_dir: Path, fem_csv: str | None):
     return metrics
 
 
+def _get_mlflow():
+    try:
+        import mlflow
+        return mlflow
+    except ImportError:
+        return None
+
+
 def main():
     args = parse_args()
     _set_seed(args.seed)
 
-    # Force non-interactive matplotlib for the whole pipeline.
     import matplotlib
     matplotlib.use("Agg")
 
     run_dir = _resolve_run_dir(args.run_name)
     print(f"Run directory: {run_dir}")
+
+    mlflow = _get_mlflow()
 
     suffixes = []
     if "indirect" in args.formulations:
@@ -297,13 +397,21 @@ def main():
     trained = {}
     for formulation in args.formulations:
         print(f"  -> {formulation}")
+        config = _load_config(
+            args.config_indirect if formulation == "indirect" else args.config_direct,
+            formulation,
+        )
+        _apply_cli_overrides(config, args, formulation)
+        config.run.seed = config.run.seed or args.seed
+        config.save(run_dir / f"config_{formulation}.yaml")
+
         if args.use_pretrained:
             model, weights_path = _load_pretrained(formulation, run_dir)
             train_result = None
         elif formulation == "indirect":
-            model, weights_path, train_result = _train_indirect(args, run_dir)
+            model, weights_path, train_result = _train_indirect(args, config, run_dir)
         else:
-            model, weights_path, train_result = _train_direct(args, run_dir)
+            model, weights_path, train_result = _train_direct(args, config, run_dir)
         trained[formulation] = (model, weights_path, train_result)
 
     print("\n[3/3] Evaluating + saving figures.")
@@ -318,15 +426,35 @@ def main():
     for formulation, (model, weights_path, train_result) in trained.items():
         print(f"  -> {formulation}")
         metrics = _evaluate(formulation, model, run_dir, args.fem)
+
+        result_entry = {}
+        if train_result is not None:
+            for k, v in train_result.items():
+                if k == "loss_list":
+                    continue
+                if k == "component_history":
+                    ch = v
+                    np.save(run_dir / f"component_history_{formulation}.npy", ch)
+                    if mlflow is not None:
+                        for metric_name in ("pde", "bc", "lambda_pde", "lambda_bc"):
+                            if metric_name in ch and len(ch[metric_name]) > 0:
+                                mlflow.log_metric(
+                                    f"{formulation}_{metric_name}_final",
+                                    ch[metric_name][-1],
+                                )
+                    result_entry[k] = "saved"
+                else:
+                    result_entry[k] = (v if not hasattr(v, 'item') else float(v))
+
         summary["results"][formulation] = {
             "weights": str(weights_path.relative_to(run_dir)),
             "metrics": metrics,
-            "training": (
-                None if train_result is None
-                else {k: (v if not hasattr(v, 'item') else float(v))
-                      for k, v in train_result.items() if k != "loss_list"}
-            ),
+            "training": result_entry,
         }
+
+        if mlflow is not None:
+            for metric_name, metric_val in metrics.items():
+                mlflow.log_metric(f"{formulation}_{metric_name}", metric_val)
 
     summary["total_time_seconds"] = time.time() - started
     with open(run_dir / "summary.json", "w") as f:

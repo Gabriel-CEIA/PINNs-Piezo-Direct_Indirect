@@ -2,182 +2,138 @@
 
 ## Project
 
-Physics-Informed Neural Networks (PINNs) applied to a 2D piezoelectric beam problem. Two formulations:
-- **Indirect (voltage-driven)** — potential imposed across electrodes, beam deformation predicted
-- **Direct (force-driven)** — traction at the beam tip, electric potential recovered
+Physics-Informed Neural Networks (PINNs) for a 2D piezoelectric bimorph beam.
+Two complementary formulations:
 
-Source code lives in `src/pinn_piezo/` with scripts in `scripts/`.
+| Formulation | Input | Output | Key files |
+|---|---|---|---|
+| **Indirect** | Voltage (100 V) across electrodes | Beam deformation | `src/pinn_piezo/indirect/` |
+| **Direct** | Tip traction (0.1 N) | Electric potential | `src/pinn_piezo/direct/` |
 
-## Pre-installed tooling
+The beam is a *bimorph* — two oppositely poled PZT layers — so the
+piezoelectric coefficients ``e31`` / ``e33`` flip sign across the mid-plane
+(``materials.py:70-73``).
 
-- `opencode` CLI (global npm, installed via `postCreateCommand`)
-- `uv` (installed via `astral.sh/uv/install.sh`)
-- `specify-cli` (via `uv tool install specify-cli`)
-- `get-shit-done-cc` (global npm)
-- `find-skills` skill (installed via `npx skills add` in `postCreateCommand`)
-- `design-md` skill (`.opencode/skills/design-md/SKILL.md`) — scaffold a DESIGN.md using the Google Stitch format
-- `review-code` skill (`.opencode/skills/review-code/SKILL.md`) — review the current diff for bugs, edge cases, and correctness in a fresh subagent context
+## Critical gotchas
 
-## Essential commands
+- **dtype differs by formulation.** Indirect uses `torch.float64`, direct uses `torch.float32`. The training script sets `torch.set_default_dtype` accordingly. Using the wrong dtype silently degrades accuracy or breaks.
+- **Data suffixes differ.** Indirect loads `*_m1.npy`, direct loads `*_m1_d.npy`.
+- **Default data fraction differs.** Indirect uses 100% of collocation points, direct uses 75%.
+- **L-BFGS is disabled for direct by default** (0 epochs). Indirect defaults to 200 L-BFGS epochs after Adam.
+- **No `tests/` directory exists.** `pytest` discovers nothing. There are no CI workflows.
+- **`scikit-fem` is undeclared.** The FEM solver (`src/pinn_piezo/fem.py`) lazily imports `skfem` but it is not in `pyproject.toml` or `requirements.txt`. Install manually: `pip install scikit-fem`.
 
-### Dependencies
+## Architecture
 
+The network predicts all 8 primal fields directly: `(u, v, phi, sigmax, sigmaz, tauxz, Dx, Dy)`.
+
+**Hard boundary constraints** are embedded in the forward pass (not loss-penalized):
+- Displacement clamp at x=0: `u_modified = x * u`, `v_modified = x * v`
+- Electric potential (indirect): `phi_modified = y*(y-HEIGHT)*phi + V/HEIGHT*y`
+- Electric potential (direct): `phi_modified = (y/HEIGHT) * phi`
+
+This reduces PDE order from 2nd to 1st, requiring only first-order
+autograd for the physics loss.
+
+**Adaptive loss weighting** via gradient-norm balancing (moving average
+alpha = 0.9) in `indirect/losses.py:150-170` and `direct/losses.py:205-228`.
+
+## Ablation baseline
+
+`src/pinn_piezo/indirect/standard.py` implements the conventional ("Case A")
+PINN — only `(u, v, phi)` as outputs with 2nd-order derivatives. Used for
+the reviewer-requested architecture comparison.
+
+## Commands
+
+### Setup
 ```bash
-pip install -e . && pip freeze > requirements.txt
+pip install -e .
+# scikit-fem required for FEM solver:
+pip install scikit-fem
 ```
 
 ### Training
-
 ```bash
-python -m scripts.run_all                                              # full pipeline
-python -m scripts.generate_geometry                                    # generate data
-python -m scripts.train_indirect                                       # train indirect
-python -m scripts.train_direct                                         # train direct
+python -m scripts.run_all                                    # full pipeline
+python -m scripts.run_all --formulations indirect             # one formulation
+python -m scripts.run_all --use-pretrained --skip-data        # eval only
+python -m scripts.train_indirect                             # train indirect only
+python -m scripts.train_direct                               # train direct only
 ```
 
-### Evaluation
+Console scripts also work: `pinn-train-indirect`, `pinn-train-direct`.
 
+### Evaluation
 ```bash
 python -m scripts.evaluate --formulation indirect --state models/indirect/model_PINN_indirect_paper_3.pt
 python -m scripts.evaluate --formulation direct --state models/direct/model_PINN_direct_paper_3.pt
 ```
 
-### Testing
+Output goes to `outputs/runs/<run_name>/` — one self-contained directory
+with figures, models, loss history, and `summary.json`.
 
+### Config-driven usage
 ```bash
-pytest                                            # all tests
-pytest tests/test_file.py::function_name           # single test
-pytest --cov=src --cov-report=term-missing         # with coverage
+# Create a YAML config file, then pass it to any script:
+python -m scripts.train_indirect --config my_config.yaml
+python -m scripts.train_direct --config my_config.yaml
+python -m scripts.run_all --config-indirect indirect.yaml --config-direct direct.yaml
+
+# Override individual params from CLI:
+python -m scripts.train_indirect --config base.yaml training.lr_adam=0.005
 ```
 
-### Code quality
+Config files use nested YAML sections: `beam`, `material`, `arch`, `training`,
+`geometry`, `loading`, `run`. See `src/pinn_piezo/experiment.py` for all fields.
 
+### Environment variables (optional path overrides)
+| Variable | Default |
+|---|---|
+| `PINN_PIEZO_DATA_DIR` | `<repo>/data` |
+| `PINN_PIEZO_MODELS_DIR` | `<repo>/models` |
+| `PINN_PIEZO_OUTPUTS_DIR` | `<repo>/outputs` |
+
+All dirs are created on import and committed pre-trained weights are at
+`models/indirect/model_PINN_indirect_paper_3.pt` and
+`models/direct/model_PINN_direct_paper_3.pt`.
+
+### Experiment tracking (MLflow)
+```bash
+pip install mlflow                # optional dependency
+python -m scripts.train_indirect --mlflow    # log to MLflow
+python -m scripts.train_direct --mlflow
+mlflow ui                         # browse runs at localhost:5000
+```
+MLflow logs per-epoch loss components, adaptive weights, final L2 errors,
+and model artifacts. Without `--mlflow`, everything still works (CSV/npy).
+
+### Parameter sweeps
+```bash
+python -m scripts.sweep \
+    --base-config experiments/base_indirect.yaml \
+    --grid training.lr_adam=0.001,0.0005,0.0001 \
+    --grid arch.hidden_sizes="[50,50],[100,100],[100,250]"
+```
+Saves per-run results under `outputs/runs/` and a sweep summary + comparison
+plot under `outputs/sweeps/`.
+
+### Code quality
 ```bash
 ruff check .      # lint
 ruff format .     # format
 mypy src/         # type check
 ```
 
-### AI workflows (pre-installed)
+## Pre-installed workspace tooling
 
-```bash
-/speckit.specify        # Start feature specification
-/speckit.plan           # Create implementation plan
-/speckit.tasks          # Break plan into tasks
-/speckit.implement      # Implement tasks
-/gsd:new-project        # Start GSD workflow
-/gsd:execute-phase N    # Execute phase N
+- `opencode` CLI, `get-shit-done-cc`, `uv`, `specify-cli`
+- `review-code` skill (`.opencode/skills/review-code/`) — review current git diff
+- `design-md` skill (`.opencode/skills/design-md/`) — scaffold DESIGN.md
 
-## Context management
+## Style conventions
 
-OpenCode's context window fills up with conversation, file reads, and command output. Performance degrades as it fills. Manage it actively.
-
-- **Run `/clear` between unrelated tasks** to reset the context window entirely. A clean session with a better prompt almost always outperforms a long session with accumulated corrections.
-- **Use subagents for investigation.** When you need to explore the codebase, delegate to a subagent via the `task` tool. The subagent reads files in its own context and reports back summaries, keeping your main conversation clean.
-- **Name sessions** with `/rename` and treat them like branches — each workstream gets its own persistent context.
-- **`/compact`** to manually trigger context compaction with specific instructions (e.g., `Focus on the API changes`).
-
-## Verification-first
-
-Give OpenCode a check it can run: tests, lint, typecheck, a build step. Without it, the only signal OpenCode has that work is done is "looks done."
-
-```bash
-# Good — give a verification command in your prompt
-"Implement X. Run pytest tests/test_x.py after and fix any failures."
-
-# Better — close the loop in one prompt
-"Fix the bug in src/auth.py. Reproduce it with a failing test first,
-then fix until the test passes."
-```
-
-When the check exists, OpenCode does the work, runs the check, reads the result, and iterates until it passes — without you watching.
-
-Review the evidence (test output, lint results) rather than taking "done" at face value.
-
-## Explore → Plan → Implement
-
-Separate research and planning from implementation to avoid solving the wrong problem.
-
-1. **Explore** — Search the codebase and understand existing patterns before proposing changes. Use subagents for heavy research.
-2. **Plan** — Use `/speckit.plan` or `/speckit.specify` to create a detailed plan. Review it before proceeding.
-3. **Implement** — Execute the plan. Run verification checks after each step.
-4. **Verify** — Run tests, lint, typecheck. Use the `review-code` skill for an independent review.
-
-This maps cleanly to the pre-installed spec-kit and GSD workflows:
-- `/speckit.specify` → `/speckit.plan` → `/speckit.tasks` → `/speckit.implement`
-- `/gsd:new-project` → `/gsd:execute-phase N`
-
-For small, obvious changes (typo fix, rename, single-file edit) skip the planning — if you could describe the diff in one sentence, just do it directly.
-
-### Writer/Reviewer pattern
-
-For complex changes, use two sessions:
-
-| Session A (Writer) | Session B (Reviewer) |
-|---|---|
-| Implement the feature | Review the diff with `review-code` skill in a fresh context |
-| Address findings | Report gaps — edge cases, correctness, security |
-
-The reviewer runs in a fresh context so it evaluates the result on its own terms, not biased by how it was produced. Feed findings back to Session A, iterate, re-review.
-
-## Prompting tips
-
-The more precise your instructions, the fewer corrections needed.
-
-| Strategy | Instead of | Try |
-|---|---|---|
-| **Scope the task** | "add tests for foo.py" | "write a test for foo.py covering the edge case where the user is logged out. avoid mocks." |
-| **Reference existing patterns** | "add a calendar widget" | "look at how existing widgets are implemented in `src/components/`. follow the pattern to implement a calendar widget." |
-| **Describe the symptom** | "fix the login bug" | "login fails after session timeout. check the auth flow in `src/auth/`, especially token refresh. write a failing test that reproduces it, then fix." |
-| **Give a verification command** | "implement X" | "implement X, then run `pytest tests/test_x.py` and fix failures until green." |
-| **Reference files with `@`** | "the function in utils" | "read `@src/utils/helpers.py` and explain the `parse_date` function." |
-
-### Let OpenCode interview you
-
-For larger features, start with a brief description and ask OpenCode to interview you using the `question` tool. It will ask about technical implementation, UX, edge cases, and tradeoffs you might not have considered.
-
-```bash
-"I want to build [description]. Interview me using the question tool.
-Cover implementation, UI/UX, edge cases, and tradeoffs."
-```
-
-Once the spec is complete, start a fresh session to implement it.
-
-## Hooks
-
-OpenCode supports stop hooks — scripts that run after every file edit. Configure them in `~/.config/opencode/hooks/`.
-
-### Example: auto-format on write
-
-```bash
-# ~/.config/opencode/hooks/stop
-ruff format "$1" 2>/dev/null
-```
-
-This runs `ruff format` on every file after OpenCode edits it, keeping formatting consistent without manual steps.
-
-### Example: block edits to sensitive paths
-
-```bash
-# ~/.config/opencode/hooks/pre-start
-case "$1" in
-  .env|config/secrets*) exit 1 ;;  # block edits to secret files
-esac
-```
-
-Install hooks by creating executable scripts in the hooks directory:
-
-```bash
-mkdir -p ~/.config/opencode/hooks
-chmod +x ~/.config/opencode/hooks/stop
-```
-
-## Avoid common failure patterns
-
-| Pattern | Fix |
-|---|---|
-| **Kitchen sink session** — multiple unrelated tasks in one session. Context full of irrelevant info. | `/clear` between unrelated tasks. |
-| **Over-correcting** — Claude does something wrong, you correct it, still wrong, you correct again. Context polluted with failed approaches. | After 2 failed corrections, `/clear` and write a better initial prompt incorporating what you learned. |
-| **Trust-then-verify gap** — plausible-looking implementation that misses edge cases. | Always provide a verification check (test, lint, typecheck). Run the `review-code` skill before shipping. |
-| **Infinite exploration** — "investigate X" without scope. Reads hundreds of files, fills context. | Scope investigations narrowly or use a subagent so exploration doesn't consume main context. |
-```
+- Ruff for linting/formatting; configured in pyproject.toml dev deps.
+- No `__init__.py` re-exports — import directly from the module.
+- Prefer `from __future__ import annotations` at the top of every module.
+- Matplotlib uses `Agg` backend in non-interactive scripts (`matplotlib.use("Agg")`).

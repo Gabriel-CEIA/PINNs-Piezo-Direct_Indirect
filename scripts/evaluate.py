@@ -1,10 +1,11 @@
 """Evaluate a trained PINN model: produce field plots and FEM comparison.
 
 Usage:
-    python -m scripts.evaluate --formulation indirect \
+    python -m scripts.evaluate --formulation indirect \\
         --state models/indirect/model_PINN_indirect_paper_3.pt
-    python -m scripts.evaluate --formulation direct \
+    python -m scripts.evaluate --formulation direct \\
         --state models/direct/model_PINN_direct_paper_3.pt --fem data/FEM.csv
+    python -m scripts.evaluate --config eval_config.yaml
 """
 
 from __future__ import annotations
@@ -18,13 +19,16 @@ import torch
 
 from pinn_piezo import evaluation, plotting
 from pinn_piezo.config import DATA_DIR, RUNS_DIR, get_device
+from pinn_piezo.experiment import ExperimentConfig
 
 
 def parse_args():
     p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument("--config", type=str, default=None,
+                   help="Path to YAML config file.")
     p.add_argument("--formulation", choices=["indirect", "direct"],
-                   required=True)
-    p.add_argument("--state", type=str, required=True,
+                   default=None)
+    p.add_argument("--state", type=str, default=None,
                    help="Path to a torch state_dict (.pt) checkpoint.")
     p.add_argument("--data-dir", type=str, default=str(DATA_DIR))
     p.add_argument("--suffix", type=str,
@@ -72,17 +76,29 @@ def main():
         import matplotlib
         matplotlib.use("Agg")
 
+    formulation = args.formulation
+
+    # If no explicit formulation, try to infer from config
+    if formulation is None and args.config:
+        config = ExperimentConfig.load(args.config)
+        formulation = config.formulation
+    else:
+        config = None
+
+    if formulation is None:
+        raise ValueError("Either --formulation or --config must be provided.")
+
     device = get_device()
     print(f"Using device: {device}")
 
     model, tensorize, default_suffix = _select_model_and_tensorize(
-        args.formulation, device,
+        formulation, device,
     )
     suffix = args.suffix or default_suffix
     data_dir = Path(args.data_dir)
 
     run_name = args.run_name or (
-        f"eval_{args.formulation}_"
+        f"eval_{formulation}_"
         f"{datetime.now().strftime('%Y%m%d-%H%M%S')}"
     )
     figures_dir = RUNS_DIR / run_name / "figures"
@@ -90,7 +106,19 @@ def main():
         figures_dir.mkdir(parents=True, exist_ok=True)
         print(f"Saving figures to {figures_dir}")
 
+    if config:
+        config.save(RUNS_DIR / run_name / "config.yaml")
+
     # --- Load trained weights ----------------------------------------------
+    if args.state is None and config is not None:
+        from pinn_piezo.config import MODELS_DIR
+        candidates = {
+            "indirect": MODELS_DIR / "indirect" / "model_PINN_indirect_paper_3.pt",
+            "direct": MODELS_DIR / "direct" / "model_PINN_direct_paper_3.pt",
+        }
+        args.state = str(candidates[formulation])
+        print(f"  Using default model: {args.state}")
+
     state = torch.load(args.state, map_location=device)
     model.load_state_dict(state)
     model.eval()
@@ -157,8 +185,8 @@ def main():
                               colorbar_label='phi(V)',
                               save=args.save_figs, save_dir=figures_dir, show=args.show)
 
-        eps = 1e-25 if args.formulation == 'indirect' else 0.0
-        if args.formulation == 'indirect':
+        eps = 1e-25 if formulation == 'indirect' else 0.0
+        if formulation == 'indirect':
             u_error = np.abs(U - u_pred_gr) / (np.abs(U) + eps)
             v_error = np.abs(V - v_pred_gr) / (np.abs(V) + eps)
             phi_error = np.abs(Phi - phi_pred_gr) / (np.abs(Phi) + eps)

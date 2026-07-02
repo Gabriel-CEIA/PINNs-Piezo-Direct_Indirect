@@ -54,31 +54,46 @@ def run_adam(model, tensors, *,
              loss_weights=None,
              f: int = 500,
              checkpoints_dir: Path | None = None,
-             mlflow=None):
+             mlflow=None,
+             log_every: int = 10):
     if loss_weights is None:
         loss_weights = {'pde': 1.0, 'bc': 1.0}
 
     optimizer = torch.optim.Adam(params=model.parameters(), lr=lr)
     best_loss = float('inf')
     loss_list = []
+    pde_list = []
+    bc_list = []
+    lambda_pde_list = []
+    lambda_bc_list = []
 
     for epoch in range(epochs):
         optimizer.zero_grad()
-        loss, loss_weights = loss_func(
+        loss_result = loss_func(
             tensors["xy_top"], tensors["xy_bottom"],
             tensors["xy_right"], tensors["xy_left"],
             tensors["x_collocation"], tensors["y_collocation"],
             model, tensors["coefficients"], loss_weights, epoch, f,
         )
+        loss, loss_weights = loss_result[0], loss_result[1]
+        physics_total, bc_term = loss_result[2], loss_result[3]
+
         loss.backward()
         optimizer.step()
         loss_list.append(loss.item())
+        pde_list.append(physics_total.item())
+        bc_list.append(bc_term.item())
+        lambda_pde_list.append(loss_weights['pde'].item())
+        lambda_bc_list.append(loss_weights['bc'].item())
 
         if epoch % 100 == 0:
-            print(f"Epoch: {epoch}/{epochs}. Loss: {loss.item()}.")
-            print(optimizer.state_dict()['param_groups'][0]['lr'])
+            print(f"Epoch: {epoch}/{epochs}. Loss: {loss.item():.6e}.")
             if mlflow is not None:
-                mlflow.log_metric("loss_ADAM", loss.item(), step=epoch)
+                mlflow.log_metric("train_loss", loss.item(), step=epoch)
+                mlflow.log_metric("pde_loss", physics_total.item(), step=epoch)
+                mlflow.log_metric("bc_loss", bc_term.item(), step=epoch)
+                mlflow.log_metric("lambda_pde", loss_weights['pde'].item(), step=epoch)
+                mlflow.log_metric("lambda_bc", loss_weights['bc'].item(), step=epoch)
 
             if loss.item() < best_loss and checkpoints_dir is not None:
                 best_loss = loss.item()
@@ -98,7 +113,10 @@ def run_adam(model, tensors, *,
         if epoch % f == 0:
             print(f"Lambda_1: {loss_weights}.")
 
-    return loss_list, loss_weights, best_loss
+    return loss_list, loss_weights, best_loss, {
+        "pde": pde_list, "bc": bc_list,
+        "lambda_pde": lambda_pde_list, "lambda_bc": lambda_bc_list,
+    }
 
 
 def run_lbfgs(model, tensors, loss_weights, *,
@@ -118,18 +136,24 @@ def run_lbfgs(model, tensors, loss_weights, *,
         def closure():
             nonlocal loss_weights
             optimizer.zero_grad()
-            loss, loss_weights = loss_func(
+            loss_result = loss_func(
                 tensors["xy_top"], tensors["xy_bottom"],
                 tensors["xy_right"], tensors["xy_left"],
                 tensors["x_collocation"], tensors["y_collocation"],
                 model, tensors["coefficients"], loss_weights, epoch, f,
             )
-            loss.backward()
-            return loss
+            loss_result[0].backward()
+            return loss_result[0]
 
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.5)
         optimizer.step(closure)
-        loss = closure()
+        loss_result = loss_func(
+            tensors["xy_top"], tensors["xy_bottom"],
+            tensors["xy_right"], tensors["xy_left"],
+            tensors["x_collocation"], tensors["y_collocation"],
+            model, tensors["coefficients"], loss_weights, epoch, f,
+        )
+        loss, loss_weights = loss_result[0], loss_result[1]
         loss_list.append(loss.item())
 
         if loss.item() == nan:
@@ -138,9 +162,17 @@ def run_lbfgs(model, tensors, loss_weights, *,
 
         if epoch % 100 == 0 or epoch == epochs - 1:
             print(f"Epoch: {epochs_adam_offset + epoch}/{total_epochs}. "
-                  f"Loss: {loss.item()}.")
+                  f"Loss: {loss.item():.6e}.")
             if mlflow is not None:
-                mlflow.log_metric("loss_LBFGS", loss.item(),
+                mlflow.log_metric("train_loss", loss.item(),
+                                  step=epochs_adam_offset + epoch)
+                mlflow.log_metric("pde_loss", loss_result[2].item(),
+                                  step=epochs_adam_offset + epoch)
+                mlflow.log_metric("bc_loss", loss_result[3].item(),
+                                  step=epochs_adam_offset + epoch)
+                mlflow.log_metric("lambda_pde", loss_weights['pde'].item(),
+                                  step=epochs_adam_offset + epoch)
+                mlflow.log_metric("lambda_bc", loss_weights['bc'].item(),
                                   step=epochs_adam_offset + epoch)
 
         if loss.item() < best_loss and checkpoints_dir is not None:
@@ -174,7 +206,7 @@ def train(model, tensors, *,
 
     start_time = time.time()
 
-    loss_list_adam, loss_weights, best_loss_adam = run_adam(
+    loss_list_adam, loss_weights, best_loss_adam, component_history = run_adam(
         model, tensors,
         epochs=epochs_adam, lr=lr_adam,
         loss_weights=loss_weights, f=f,
@@ -191,13 +223,13 @@ def train(model, tensors, *,
     )
 
     total_time = time.time() - start_time
-    print(total_time)
-    print(total_time / 60)
+    print(f"Total time: {total_time:.1f}s ({total_time / 60:.1f} min)")
 
     return {
         "loss_list": loss_list_adam + loss_list_lbfgs,
         "best_loss_adam": best_loss_adam,
         "best_loss_lbfgs": best_loss_lbfgs,
         "loss_weights": loss_weights,
+        "component_history": component_history,
         "total_time": total_time,
     }

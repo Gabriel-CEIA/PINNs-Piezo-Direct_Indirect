@@ -93,7 +93,8 @@ def physics_loss(x, y, model, coefficients):
                        + torch.mean(divergence_sigma2 ** 2)
                        + torch.mean(divergence_D ** 2))
 
-    return loss_mech + loss_elec + loss_divergence
+    return (loss_mech + loss_elec + loss_divergence,
+            loss_mech, loss_elec, loss_divergence)
 
 
 def stress_BC_loss(xy_top, xy_bottom, xy_right, xy_left, model):
@@ -174,15 +175,16 @@ def loss_func(xy_top, xy_bottom, xy_right, xy_left,
               x_collocation, y_collocation,
               model, coefficients, loss_weights, n, f, adjust=False):
     BC_term = get_BC_loss(xy_top, xy_bottom, xy_right, xy_left, model)
-    physics_loss_term = physics_loss(x_collocation, y_collocation, model,
-                                     coefficients)
+    physics_total, loss_mech, loss_elec, loss_div = physics_loss(
+        x_collocation, y_collocation, model, coefficients,
+    )
 
     if n % f == 0 and adjust:
-        loss_weights = update_weights(physics_loss_term, BC_term, loss_weights,
+        loss_weights = update_weights(physics_total, BC_term, loss_weights,
                                       model)
 
     lambda1 = loss_weights['bc']
     lambda3 = loss_weights['pde']
 
-    loss = lambda1 * BC_term + lambda3 * physics_loss_term
-    return loss, loss_weights
+    loss = lambda1 * BC_term + lambda3 * physics_total
+    return loss, loss_weights, physics_total, BC_term, loss_mech, loss_elec, loss_div
