@@ -12,20 +12,12 @@ torchopt>=0.7
 torchsummary>=1.5
 pyDOE>=0.3.8
 
-# Testing
-pytest>=8.0
-pytest-cov
+# Config / experiment management
+pyyaml>=6.0
 
-# Code quality
-ruff>=0.5
-
-# Type checking
-mypy
+# FEM reference solver
+scikit-fem>=9.0
 
 # Utilities
 requests
 python-dotenv
-
-# Jupyter support
-ipykernel
-notebook

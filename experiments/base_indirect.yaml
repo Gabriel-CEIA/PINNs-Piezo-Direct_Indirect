@@ -1,0 +1,44 @@
+formulation: indirect
+
+beam:
+  width: 0.1
+  height: 0.001
+
+material:
+  E: 2.0e9
+  NU: 0.29
+  G: 775000000.0
+  d31: 2.2e-11
+  d33: -3.0e-11
+  rel_permittivity: 12
+
+arch:
+  hidden_sizes:
+    - 100
+    - 250
+  activation: tanh
+  model_type: pyramid
+
+training:
+  epochs_adam: 1000
+  epochs_lbfgs: 200
+  lr_adam: 0.001
+  lr_lbfgs: 0.01
+  data_fraction: 1.0
+  adaptive_weight_f: 500
+  data_suffix: _m1
+  gradient_clip: 0.5
+  adaptive_alpha: 0.9
+
+geometry:
+  n_points: 400
+  n_collocation: 150
+  n_collocation_test: 200
+
+loading:
+  voltage: 100.0
+  applied_force_y: 0.1
+
+run:
+  seed: null
+  name: null

@@ -21,7 +21,7 @@ piezoelectric coefficients ``e31`` / ``e33`` flip sign across the mid-plane
 - **Default data fraction differs.** Indirect uses 100% of collocation points, direct uses 75%.
 - **L-BFGS is disabled for direct by default** (0 epochs). Indirect defaults to 200 L-BFGS epochs after Adam.
 - **No `tests/` directory exists.** `pytest` discovers nothing. There are no CI workflows.
-- **`scikit-fem` is undeclared.** The FEM solver (`src/pinn_piezo/fem.py`) lazily imports `skfem` but it is not in `pyproject.toml` or `requirements.txt`. Install manually: `pip install scikit-fem`.
+- **Sample configs** at `experiments/base_indirect.yaml` and `experiments/base_direct.yaml` — ready to use with `--config`.
 
 ## Architecture
 
@@ -49,8 +49,7 @@ the reviewer-requested architecture comparison.
 ### Setup
 ```bash
 pip install -e .
-# scikit-fem required for FEM solver:
-pip install scikit-fem
+# optional: pip install -e ".[mlflow,dev]"
 ```
 
 ### Training
@@ -76,12 +75,12 @@ with figures, models, loss history, and `summary.json`.
 ### Config-driven usage
 ```bash
 # Create a YAML config file, then pass it to any script:
-python -m scripts.train_indirect --config my_config.yaml
-python -m scripts.train_direct --config my_config.yaml
-python -m scripts.run_all --config-indirect indirect.yaml --config-direct direct.yaml
+python -m scripts.train_indirect --config experiments/base_indirect.yaml
+python -m scripts.train_direct --config experiments/base_direct.yaml
+python -m scripts.run_all --config-indirect experiments/base_indirect.yaml --config-direct experiments/base_direct.yaml
 
 # Override individual params from CLI:
-python -m scripts.train_indirect --config base.yaml training.lr_adam=0.005
+python -m scripts.train_indirect --config experiments/base_indirect.yaml training.lr_adam=0.005
 ```
 
 Config files use nested YAML sections: `beam`, `material`, `arch`, `training`,

@@ -19,6 +19,8 @@ dependencies = [
     "openpyxl",
     "requests",
     "python-dotenv",
+    "pyyaml>=6.0",
+    "scikit-fem>=9.0",
 ]
 
 [project.optional-dependencies]
