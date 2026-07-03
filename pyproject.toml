@@ -51,3 +51,12 @@ include = ["pinn_piezo*", "scripts*"]
 [tool.setuptools.package-dir]
 "" = "src"
 "scripts" = "scripts"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+markers = ["slow: tests that take >5 s"]
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["*/tests/*"]

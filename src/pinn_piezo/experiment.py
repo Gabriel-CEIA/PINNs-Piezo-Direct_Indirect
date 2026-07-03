@@ -115,9 +115,7 @@ class ExperimentConfig:
         path = Path(path)
         with open(path) as f:
             data = yaml.safe_load(f)
-        config = cls._dict_to_dataclass(data, cls)
-        config.__post_init__()
-        return config
+        return cls.from_dict(data)
 
     def save(self, path: str | Path) -> None:
         path = Path(path)
@@ -130,8 +128,18 @@ class ExperimentConfig:
 
     @classmethod
     def from_dict(cls, data: dict) -> ExperimentConfig:
-        config = cls._dict_to_dataclass(data, cls)
-        config.__post_init__()
+        formulation = data.get("formulation", "indirect")
+        config = cls.default_direct() if formulation == "direct" else cls.default_indirect()
+        for section, values in data.items():
+            if section == "formulation":
+                continue
+            obj = getattr(config, section, None)
+            if obj is not None and isinstance(values, dict):
+                for key, val in values.items():
+                    if hasattr(obj, key):
+                        setattr(obj, key, val)
+            elif hasattr(config, section):
+                setattr(config, section, values)
         return config
 
     def override(self, key_value: str) -> None:
