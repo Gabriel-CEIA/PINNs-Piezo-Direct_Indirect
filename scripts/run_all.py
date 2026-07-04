@@ -155,6 +155,10 @@ def _train_indirect(args, config: ExperimentConfig, run_dir: Path):
         epochs_lbfgs=config.training.epochs_lbfgs,
         checkpoints_adam_dir=ckpt_adam,
         checkpoints_lbfgs_dir=ckpt_lbfgs,
+        lr_step_size=config.training.lr_step_size,
+        lr_gamma=config.training.lr_gamma,
+        early_stop_patience=config.training.early_stop_patience,
+        early_stop_min_delta=config.training.early_stop_min_delta,
     )
 
     weights_path = run_dir / "models" / "model_PINN_indirect.pt"
@@ -209,6 +213,10 @@ def _train_direct(args, config: ExperimentConfig, run_dir: Path):
         model, tensors,
         epochs_adam=config.training.epochs_adam,
         epochs_lbfgs=config.training.epochs_lbfgs,
+        lr_step_size=config.training.lr_step_size,
+        lr_gamma=config.training.lr_gamma,
+        early_stop_patience=config.training.early_stop_patience,
+        early_stop_min_delta=config.training.early_stop_min_delta,
     )
 
     weights_path = run_dir / "models" / "model_PINN_direct.pt"

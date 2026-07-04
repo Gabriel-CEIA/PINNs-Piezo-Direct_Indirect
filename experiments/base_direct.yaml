@@ -29,6 +29,10 @@ training:
   data_suffix: _m1_d
   gradient_clip: 0.5
   adaptive_alpha: 0.9
+  lr_step_size: 5000
+  lr_gamma: 0.95
+  early_stop_patience: 200
+  early_stop_min_delta: 1.0e-8
 
 geometry:
   n_points: 400

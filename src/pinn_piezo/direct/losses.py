@@ -259,4 +259,4 @@ def loss_func(xy_top, xy_bottom, xy_right, xy_left,
     lambda3 = loss_weights['pde']
 
     loss = lambda1 * BC_term + lambda3 * physics_loss_term
-    return loss, loss_weights
+    return loss, loss_weights, physics_loss_term, BC_term, stress_loss_term, electric_loss_term

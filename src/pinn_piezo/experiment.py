@@ -50,6 +50,10 @@ class TrainingConfig:
     data_suffix: str = "_m1"
     gradient_clip: float = 0.5
     adaptive_alpha: float = 0.9
+    lr_step_size: int = 5000
+    lr_gamma: float = 0.95
+    early_stop_patience: int = 200
+    early_stop_min_delta: float = 1e-8
 
 
 @dataclass

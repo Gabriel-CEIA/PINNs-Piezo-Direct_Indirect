@@ -105,6 +105,10 @@ def main():
         checkpoints_adam_dir=ckpt_adam,
         checkpoints_lbfgs_dir=ckpt_lbfgs,
         mlflow=mlflow,
+        lr_step_size=config.training.lr_step_size,
+        lr_gamma=config.training.lr_gamma,
+        early_stop_patience=config.training.early_stop_patience,
+        early_stop_min_delta=config.training.early_stop_min_delta,
     )
 
     print("Best LBFGS loss:", result["best_loss_lbfgs"])

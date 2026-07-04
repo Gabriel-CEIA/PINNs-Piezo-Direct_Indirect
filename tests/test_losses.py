@@ -108,6 +108,7 @@ class TestDirectLosses:
         y = torch.randn(batch_size, 1, device=device, requires_grad=True)
         coeff = _coeff(batch_size).to(device)
         weights = {"pde": torch.tensor(1.0), "bc": torch.tensor(1.0)}
-        loss, w2 = direct_loss_func(xy, xy, xy, xy, x, y, model, coeff, weights, 0, 10)
+        result = direct_loss_func(xy, xy, xy, xy, x, y, model, coeff, weights, 0, 10)
+        loss, w2 = result[0], result[1]
         assert loss.ndim == 0
         assert loss > 0

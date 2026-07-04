@@ -177,6 +177,10 @@ def _train_and_evaluate(config: ExperimentConfig, run_name: str, mlflow):
             lr_lbfgs=config.training.lr_lbfgs,
             f=config.training.adaptive_weight_f,
             mlflow=mlflow,
+            lr_step_size=config.training.lr_step_size,
+            lr_gamma=config.training.lr_gamma,
+            early_stop_patience=config.training.early_stop_patience,
+            early_stop_min_delta=config.training.early_stop_min_delta,
         )
     else:
         from pinn_piezo.direct import model as dir_model
@@ -199,6 +203,10 @@ def _train_and_evaluate(config: ExperimentConfig, run_name: str, mlflow):
             lr_lbfgs=config.training.lr_lbfgs,
             f=config.training.adaptive_weight_f,
             mlflow=mlflow,
+            lr_step_size=config.training.lr_step_size,
+            lr_gamma=config.training.lr_gamma,
+            early_stop_patience=config.training.early_stop_patience,
+            early_stop_min_delta=config.training.early_stop_min_delta,
         )
 
     # Save model and loss

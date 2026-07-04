@@ -55,17 +55,23 @@ def run_adam(model, tensors, *,
              f: int = 500,
              checkpoints_dir: Path | None = None,
              mlflow=None,
-             log_every: int = 10):
+             log_every: int = 10,
+             lr_step_size: int = 5000,
+             lr_gamma: float = 0.95,
+             early_stop_patience: int = 200,
+             early_stop_min_delta: float = 1e-8):
     if loss_weights is None:
         loss_weights = {'pde': 1.0, 'bc': 1.0}
 
     optimizer = torch.optim.Adam(params=model.parameters(), lr=lr)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=lr_step_size, gamma=lr_gamma)
     best_loss = float('inf')
     loss_list = []
     pde_list = []
     bc_list = []
     lambda_pde_list = []
     lambda_bc_list = []
+    no_improve_count = 0
 
     for epoch in range(epochs):
         optimizer.zero_grad()
@@ -80,23 +86,33 @@ def run_adam(model, tensors, *,
 
         loss.backward()
         optimizer.step()
-        loss_list.append(loss.item())
+        scheduler.step()
+
+        loss_val = loss.item()
+        loss_list.append(loss_val)
         pde_list.append(physics_total.item())
         bc_list.append(bc_term.item())
         lambda_pde_list.append(loss_weights['pde'].item())
         lambda_bc_list.append(loss_weights['bc'].item())
 
+        # Early stopping check
+        if loss_val < best_loss - early_stop_min_delta:
+            best_loss = loss_val
+            no_improve_count = 0
+        else:
+            no_improve_count += 1
+
         if epoch % 100 == 0:
-            print(f"Epoch: {epoch}/{epochs}. Loss: {loss.item():.6e}.")
+            print(f"Epoch: {epoch}/{epochs}. Loss: {loss_val:.6e}.")
             if mlflow is not None:
-                mlflow.log_metric("train_loss", loss.item(), step=epoch)
+                mlflow.log_metric("train_loss", loss_val, step=epoch)
                 mlflow.log_metric("pde_loss", physics_total.item(), step=epoch)
                 mlflow.log_metric("bc_loss", bc_term.item(), step=epoch)
                 mlflow.log_metric("lambda_pde", loss_weights['pde'].item(), step=epoch)
                 mlflow.log_metric("lambda_bc", loss_weights['bc'].item(), step=epoch)
 
-            if loss.item() < best_loss and checkpoints_dir is not None:
-                best_loss = loss.item()
+            if loss_val < best_loss and checkpoints_dir is not None:
+                best_loss = loss_val
                 ckpt_path = Path(checkpoints_dir) / (
                     f"model_epoch_{epoch}_loss_{best_loss:.4f}.pt"
                 )
@@ -104,7 +120,7 @@ def run_adam(model, tensors, *,
                     'epoch': epoch,
                     'model_state_dict': model.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
-                    'loss': loss.item(),
+                    'loss': loss_val,
                     'loss_weights': loss_weights,
                 }, ckpt_path)
                 print(f"Checkpoint saved at epoch {epoch} with loss "
@@ -112,6 +128,11 @@ def run_adam(model, tensors, *,
 
         if epoch % f == 0:
             print(f"Lambda_1: {loss_weights}.")
+
+        if no_improve_count >= early_stop_patience:
+            print(f"Early stopping at epoch {epoch} "
+                  f"(no improvement for {early_stop_patience} epochs).")
+            break
 
     return loss_list, loss_weights, best_loss, {
         "pde": pde_list, "bc": bc_list,
@@ -200,7 +221,11 @@ def train(model, tensors, *,
           f: int = 500,
           checkpoints_adam_dir: Path | None = None,
           checkpoints_lbfgs_dir: Path | None = None,
-          mlflow=None):
+          mlflow=None,
+          lr_step_size: int = 5000,
+          lr_gamma: float = 0.95,
+          early_stop_patience: int = 200,
+          early_stop_min_delta: float = 1e-8):
     if loss_weights is None:
         loss_weights = {'pde': 1.0, 'bc': 1.0}
 
@@ -212,6 +237,10 @@ def train(model, tensors, *,
         loss_weights=loss_weights, f=f,
         checkpoints_dir=checkpoints_adam_dir,
         mlflow=mlflow,
+        lr_step_size=lr_step_size,
+        lr_gamma=lr_gamma,
+        early_stop_patience=early_stop_patience,
+        early_stop_min_delta=early_stop_min_delta,
     )
 
     loss_list_lbfgs, loss_weights, best_loss_lbfgs = run_lbfgs(
