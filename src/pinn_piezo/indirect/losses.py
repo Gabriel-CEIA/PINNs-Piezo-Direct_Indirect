@@ -5,13 +5,22 @@ from __future__ import annotations
 import torch
 from torch import nn
 
+from ..config import HEIGHT, WIDTH
+
 
 loss_fn = nn.MSELoss()
 
 
-def physics_loss(x, y, model, coefficients):
+def _grad(out, wrt, scale=1.0):
+    return torch.autograd.grad(outputs=out, inputs=wrt,
+                               grad_outputs=torch.ones_like(out),
+                               create_graph=True, retain_graph=True)[0] / scale
+
+
+def physics_loss(x, y, model, coefficients, normalize=False):
     """PDE residual: stress / displacement field / charge density."""
-    scale_factor = 1  # noqa: F841 (kept to match the notebook structure)
+    x_scale = WIDTH if normalize else 1.0
+    y_scale = HEIGHT if normalize else 1.0
 
     x_data = x
     y_data = y
@@ -27,27 +36,22 @@ def physics_loss(x, y, model, coefficients):
     Dx_pred = y_hat[:, 6:7]
     Dy_pred = y_hat[:, 7:8]
 
-    def _g(out, wrt):
-        return torch.autograd.grad(outputs=out, inputs=wrt,
-                                   grad_outputs=torch.ones_like(out),
-                                   create_graph=True, retain_graph=True)[0]
+    ux = _grad(u_pred, x_data, scale=x_scale)
+    uy = _grad(u_pred, y_data, scale=y_scale)
 
-    ux = _g(u_pred, x_data)
-    uy = _g(u_pred, y_data)
+    vx = _grad(v_pred, x_data, scale=x_scale)
+    vy = _grad(v_pred, y_data, scale=y_scale)
 
-    vx = _g(v_pred, x_data)
-    vy = _g(v_pred, y_data)
+    phix = _grad(phi_pred, x_data, scale=x_scale)
+    phiy = _grad(phi_pred, y_data, scale=y_scale)
 
-    phix = _g(phi_pred, x_data)
-    phiy = _g(phi_pred, y_data)
+    sigmax_pred_x = _grad(sigmax_pred, x_data, scale=x_scale)
+    tauxz_pred_y = _grad(tauxz_pred, y_data, scale=y_scale)
+    tauxz_pred_x = _grad(tauxz_pred, x_data, scale=x_scale)
+    sigmaz_pred_y = _grad(sigmaz_pred, y_data, scale=y_scale)
 
-    sigmax_pred_x = _g(sigmax_pred, x_data)
-    tauxz_pred_y = _g(tauxz_pred, y_data)
-    tauxz_pred_x = _g(tauxz_pred, x_data)
-    sigmaz_pred_y = _g(sigmaz_pred, y_data)
-
-    Dx_pred_x = _g(Dx_pred, x_data)
-    Dy_pred_y = _g(Dy_pred, y_data)
+    Dx_pred_x = _grad(Dx_pred, x_data, scale=x_scale)
+    Dy_pred_y = _grad(Dy_pred, y_data, scale=y_scale)
 
     epsilon_xx = ux
     epsilon_yy = vy
@@ -173,10 +177,12 @@ def update_weights(pde_loss, bc_loss, weights, model):
 
 def loss_func(xy_top, xy_bottom, xy_right, xy_left,
               x_collocation, y_collocation,
-              model, coefficients, loss_weights, n, f, adjust=False):
+              model, coefficients, loss_weights, n, f, adjust=False,
+              normalize=False):
     BC_term = get_BC_loss(xy_top, xy_bottom, xy_right, xy_left, model)
     physics_total, loss_mech, loss_elec, loss_div = physics_loss(
         x_collocation, y_collocation, model, coefficients,
+        normalize=normalize,
     )
 
     if n % f == 0 and adjust:

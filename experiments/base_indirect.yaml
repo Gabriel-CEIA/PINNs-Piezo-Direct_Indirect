@@ -33,6 +33,7 @@ training:
   lr_gamma: 0.95
   early_stop_patience: 200
   early_stop_min_delta: 1.0e-8
+  normalize_inputs: false
 
 geometry:
   n_points: 400

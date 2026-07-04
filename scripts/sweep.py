@@ -163,12 +163,14 @@ def _train_and_evaluate(config: ExperimentConfig, run_name: str, mlflow):
             device=device,
             model_type=config.arch.model_type,
             hidden_sizes=tuple(config.arch.hidden_sizes),
+            normalize=config.training.normalize_inputs,
         )
         arrays = ind_train.load_dataset(
             DATA_DIR, suffix=config.training.data_suffix,
             fraction=config.training.data_fraction,
         )
-        tensors = ind_train.to_device(arrays, device)
+        tensors = ind_train.to_device(arrays, device,
+                                      normalize=config.training.normalize_inputs)
         result = ind_train.train(
             model, tensors,
             epochs_adam=config.training.epochs_adam,
@@ -181,6 +183,7 @@ def _train_and_evaluate(config: ExperimentConfig, run_name: str, mlflow):
             lr_gamma=config.training.lr_gamma,
             early_stop_patience=config.training.early_stop_patience,
             early_stop_min_delta=config.training.early_stop_min_delta,
+            normalize=config.training.normalize_inputs,
         )
     else:
         from pinn_piezo.direct import model as dir_model
@@ -189,12 +192,14 @@ def _train_and_evaluate(config: ExperimentConfig, run_name: str, mlflow):
         model = dir_model.build_default_model(
             device=device,
             hidden_sizes=tuple(config.arch.hidden_sizes),
+            normalize=config.training.normalize_inputs,
         )
         arrays = dir_train.load_dataset(
             DATA_DIR, suffix=config.training.data_suffix,
             fraction=config.training.data_fraction,
         )
-        tensors = dir_train.to_device(arrays, device)
+        tensors = dir_train.to_device(arrays, device,
+                                      normalize=config.training.normalize_inputs)
         result = dir_train.train(
             model, tensors,
             epochs_adam=config.training.epochs_adam,
@@ -207,6 +212,7 @@ def _train_and_evaluate(config: ExperimentConfig, run_name: str, mlflow):
             lr_gamma=config.training.lr_gamma,
             early_stop_patience=config.training.early_stop_patience,
             early_stop_min_delta=config.training.early_stop_min_delta,
+            normalize=config.training.normalize_inputs,
         )
 
     # Save model and loss

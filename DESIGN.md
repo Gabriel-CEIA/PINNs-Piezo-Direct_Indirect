@@ -1,260 +1,126 @@
----
-version: alpha
-name: <project-name>-design
-description: <brief description of the design language (1-2 sentences)>
-
-colors:
-  primary: "<hex>"
-  on-primary: "<hex>"
-  canvas: "<hex>"
-  canvas-soft: "<hex>"
-  ink: "<hex>"
-  body: "<hex>"
-  mute: "<hex>"
-  hairline: "<hex>"
-  link: "<hex>"
-  success: "<hex>"
-  error: "<hex>"
-  warning: "<hex>"
-
-typography:
-  fontFamily: "<family>, <fallback>"
-  display-xl:
-    fontFamily: "<family>, <fallback>"
-    fontSize: <px>
-    fontWeight: <number>
-    lineHeight: <px>
-    letterSpacing: <px>
-  display-lg:
-    fontFamily: "<family>, <fallback>"
-    fontSize: <px>
-    fontWeight: <number>
-    lineHeight: <px>
-    letterSpacing: <px>
-  display-md:
-    fontFamily: "<family>, <fallback>"
-    fontSize: <px>
-    fontWeight: <number>
-    lineHeight: <px>
-    letterSpacing: <px>
-  body-lg:
-    fontFamily: "<family>, <fallback>"
-    fontSize: <px>
-    fontWeight: <number>
-    lineHeight: <px>
-    letterSpacing: <px>
-  body-md:
-    fontFamily: "<family>, <fallback>"
-    fontSize: <px>
-    fontWeight: <number>
-    lineHeight: <px>
-  body-sm:
-    fontFamily: "<family>, <fallback>"
-    fontSize: <px>
-    fontWeight: <number>
-    lineHeight: <px>
-  caption:
-    fontFamily: "<family>, <fallback>"
-    fontSize: <px>
-    fontWeight: <number>
-    lineHeight: <px>
-  code:
-    fontFamily: "<mono-family>, <mono-fallback>"
-    fontSize: <px>
-    fontWeight: <number>
-    lineHeight: <px>
-    letterSpacing: <px>
-  button:
-    fontFamily: "<family>, <fallback>"
-    fontSize: <px>
-    fontWeight: <number>
-    lineHeight: <px>
-
-spacing:
-  xxs: <px>
-  xs: <px>
-  sm: <px>
-  md: <px>
-  lg: <px>
-  xl: <px>
-  2xl: <px>
-  3xl: <px>
-  4xl: <px>
-  5xl: <px>
-  section: <px>
-
-rounded:
-  none: 0px
-  xs: <px>
-  sm: <px>
-  md: <px>
-  lg: <px>
-  xl: <px>
-  pill: <px>
-  full: 9999px
-
-components:
-  button-primary:
-    backgroundColor: "{colors.primary}"
-    textColor: "{colors.on-primary}"
-    rounded: "{rounded.pill}"
-    typography: "{typography.button}"
-    padding: "<px> <px>"
-  button-secondary:
-    backgroundColor: "{colors.canvas}"
-    textColor: "{colors.ink}"
-    borderColor: "{colors.hairline}"
-    rounded: "{rounded.pill}"
-    typography: "{typography.button}"
-    padding: "<px> <px>"
-  card-default:
-    backgroundColor: "{colors.canvas}"
-    textColor: "{colors.ink}"
-    rounded: "{rounded.md}"
-    padding: "{spacing.lg}"
-  form-input:
-    backgroundColor: "{colors.canvas}"
-    textColor: "{colors.ink}"
-    borderColor: "{colors.hairline}"
-    rounded: "{rounded.sm}"
-    typography: "{typography.body-md}"
-    padding: "<px> <px>"
-  nav-bar:
-    backgroundColor: "{colors.canvas}"
-    textColor: "{colors.ink}"
-    height: <px>
-    padding: "{spacing.sm} {spacing.lg}"
-  footer:
-    backgroundColor: "{colors.canvas}"
-    textColor: "{colors.body}"
-    padding: "{spacing.4xl} {spacing.lg}"
----
+# PINNs-Piezo-Direct_Indirect — Architecture Design
 
 ## Overview
 
-<2-4 sentences describing the design philosophy, mood, and character of the project's visual language.>
-
-## Colors
-
-### Brand & Accent
-
-- **Primary** (`{colors.primary}`) — <usage description>
-- **On Primary** (`{colors.on-primary}`) — <usage description>
-
-### Surface
-
-- **Canvas** (`{colors.canvas}`) — <usage description>
-- **Canvas Soft** (`{colors.canvas-soft}`) — <usage description>
-
-### Text
-
-- **Ink** (`{colors.ink}`) — <usage description>
-- **Body** (`{colors.body}`) — <usage description>
-- **Mute** (`{colors.mute}`) — <usage description>
-
-### Semantic
-
-- **Link** (`{colors.link}`) — <usage description>
-- **Success** (`{colors.success}`) — <usage description>
-- **Error** (`{colors.error}`) — <usage description>
-- **Warning** (`{colors.warning}`) — <usage description>
-
-## Typography
-
-### Font Family
-
-<Describe the font stack and any special typographic voice.>
-
-### Hierarchy
-
-| Token | Size | Weight | Line Height | Letter Spacing | Use |
-|---|---|---|---|---|---|
-| `{typography.display-xl}` | <px> | <weight> | <px> | <px> | <use case> |
-| `{typography.display-lg}` | <px> | <weight> | <px> | <px> | <use case> |
-| `{typography.display-md}` | <px> | <weight> | <px> | <px> | <use case> |
-| `{typography.body-lg}` | <px> | <weight> | <px> | <px> | <use case> |
-| `{typography.body-md}` | <px> | <weight> | <px> | — | <use case> |
-| `{typography.body-sm}` | <px> | <weight> | <px> | <px> | <use case> |
-| `{typography.caption}` | <px> | <weight> | <px> | — | <use case> |
-| `{typography.code}` | <px> | <weight> | <px> | <px> | <use case> |
-| `{typography.button}` | <px> | <weight> | <px> | — | <use case> |
-
-### Principles
-
-- <rule 1>
-- <rule 2>
-
-## Layout & Spacing
-
-### Spacing System
-
-- **Base unit**: <N>px. All spacing values are multiples of this unit.
-- **Tokens**: `{spacing.xs}` — <px>, `{spacing.sm}` — <px>, `{spacing.md}` — <px>, `{spacing.lg}` — <px>, `{spacing.xl}` — <px>, ...
-
-### Grid & Container
-
-- **Max width**: ~<N>px. Content centres with horizontal gutters.
-- **Column patterns**: <describe typical layouts>
-
-### Whitespace Philosophy
-
-<Describe how whitespace is used in the design.>
-
-## Shapes & Elevation
-
-### Border Radius Scale
-
-| Token | Value | Use |
-|---|---|---|
-| `{rounded.none}` | 0px | <use case> |
-| `{rounded.sm}` | <px> | <use case> |
-| `{rounded.md}` | <px> | <use case> |
-| `{rounded.lg}` | <px> | <use case> |
-| `{rounded.pill}` | <px> | <use case> |
-| `{rounded.full}` | 9999px | <use case> |
-
-### Shadow & Elevation
-
-| Level | Treatment | Use |
-|---|---|---|
-| Level 0 — Flat | <shadow value> | <use case> |
-| Level 1 — Subtle | <shadow value> | <use case> |
-| Level 2 — Elevated | <shadow value> | <use case> |
+Physics-Informed Neural Networks (PINNs) for a 2D piezoelectric bimorph beam.
+Two complementary formulations share the same network backbone but differ in
+their boundary conditions, loss terms, and input/output semantics.
 
 ## Components
 
-### Buttons
+### Source tree (`src/pinn_piezo/`)
 
-- **`button-primary`** — <description>. Background `{colors.primary}`, text `{colors.on-primary}`, shape `{rounded.pill}`, label in `{typography.button}`.
-- **`button-secondary`** — <description>. Background `{colors.canvas}`, text `{colors.ink}`, shape `{rounded.pill}`, 1px `{colors.hairline}` border.
+```
+pinn_piezo/
+├── __init__.py          # Package exports
+├── config.py            # Geometry constants, filesystem paths, env overrides
+├── experiment.py        # ExperimentConfig: dataclass + YAML load/save + CLI overrides
+├── materials.py         # Piezoelectric coefficients (bimorph), coupled matrix assembly
+├── geometry.py          # Latin Hypercube sampling, .npy persistence
+├── evaluation.py        # FEM ground-truth CSV loading, relative L2 error
+├── metrics.py           # RMSE, MAE, max-abs, nRMSE, field_metrics, metrics_table
+├── fem.py               # scikit-fem coupled piezo FEM solver (reference)
+├── plotting.py          # Matplotlib helpers: loss curves, fields, deformation, dashboard
+│
+├── indirect/            # Voltage-driven formulation (100 V → deformation)
+│   ├── model.py         # FCNUniform, FCNPyramid, hard constraints for clamp + electrodes
+│   ├── losses.py        # Physics loss (constitutive + divergence), BC losses, adaptive weights
+│   ├── train.py         # load_dataset, to_device, run_adam, run_lbfgs, train
+│   └── standard.py      # Ablation baseline: conventional (u,v,phi)-only, 2nd-order PDE
+│
+└── direct/              # Force-driven formulation (0.1 N → electric potential)
+    ├── model.py         # FCN with SinActivation (SIREN init), hard constraints
+    ├── losses.py        # Physics loss (column-wise Jacobian), BC losses, adaptive weights
+    └── train.py         # load_dataset, to_device, run_adam, run_lbfgs, train
+```
 
-### Cards & Containers
+### Scripts (`scripts/`)
 
-- **`card-default`** — <description>. Background `{colors.canvas}`, padding `{spacing.lg}`, shape `{rounded.md}`.
+```
+scripts/
+├── generate_geometry.py   # Generate .npy datasets for both formulations
+├── train_indirect.py      # Train indirect PINN (config/CLI/MLflow)
+├── train_direct.py        # Train direct PINN (config/CLI/MLflow)
+├── evaluate.py            # Evaluate trained model vs FEM ground truth
+├── run_all.py             # End-to-end pipeline (data → train → eval, both formulations)
+└── sweep.py               # Grid search over hyperparameters
+```
 
-### Inputs & Forms
+## Data Flow
 
-- **`form-input`** — <description>. Background `{colors.canvas}`, 1px `{colors.hairline}` border, shape `{rounded.sm}`, height <N>px.
+```
+YAML config ──→ ExperimentConfig ──→ Script entry point
+                                          │
+                                      load_dataset()  ──→ .npy files
+                                          │
+                                      to_device()
+                                          │
+                                      model.forward(x, y)
+                                          │
+                                     ┌────┴────┐
+                                     │         │
+                              physics_loss   BC_losses
+                              (PDE residual)  (traction, electric, displacement)
+                                     │         │
+                                     └────┬────┘
+                                          │
+                                    weighted sum
+                                          │
+                                    optimizer.step()
+                                          │
+                              ┌───────────┴───────────┐
+                              │                       │
+                         model.pt              evaluation.py
+                         loss.npy                 │
+                         figures/            FEM comparison
+                                              metrics table
+```
 
-### Navigation
+## Formulation Comparison
 
-- **`nav-bar`** — <description>. Background `{colors.canvas}`, height <N>px.
-- **`footer`** — <description>. Background `{colors.canvas}`, padding `{spacing.4xl} {spacing.lg}`.
+| Aspect | Indirect | Direct |
+|---|---|---|
+| **Input** | 100 V across electrodes | 0.1 N tip traction |
+| **Output** | Beam deformation (u, v, phi) | Electric potential (phi) |
+| **Default dtype** | `torch.float64` | `torch.float32` |
+| **Data suffix** | `_m1` | `_m1_d` |
+| **Data fraction** | 100% | 75% |
+| **Adam epochs** | 1000 | 3000 |
+| **L-BFGS epochs** | 200 | 0 |
+| **Model type** | Pyramid or Uniform | FCN (Tanh or Sin) |
+| **Hard φ constraint** | `y*(y-H)*φ + V/H*y` | `(y/H) * φ` |
 
-## Do's and Don'ts
+## Key Design Decisions
 
-### Do
+### Hard boundary constraints
+Displacement clamp at x=0 and electric potential BCs are embedded in the
+forward pass (not loss-penalized). This reduces PDE order from 2nd to 1st,
+requiring only first-order autograd for the physics loss. The network predicts
+all 8 primal fields directly: `(u, v, phi, σ_xx, σ_zz, τ_xz, D_x, D_y)`.
 
-- <guideline 1>
-- <guideline 2>
-- <guideline 3>
-- <guideline 4>
-- <guideline 5>
+### Adaptive loss weighting
+Gradient-norm balancing with EMA (α=0.9). The weight for each loss component
+is proportional to the ratio of total gradient norm to that component's
+gradient norm. Updated every `f` epochs.
 
-### Don't
+### Config system
+Python dataclasses (`ExperimentConfig`) with nested sub-configs (beam,
+material, arch, training, geometry, loading, run). YAML serialization for
+persistence and sharing. CLI dot-notation overrides for ad-hoc changes.
 
-- <anti-pattern 1>
-- <anti-pattern 2>
-- <anti-pattern 3>
-- <anti-pattern 4>
-- <anti-pattern 5>
+### Experiment tracking
+MLflow (optional) logs per-epoch loss components, adaptive weights, final L2
+errors, and model artifacts. CSV/npy fallback when MLflow is not installed.
+
+### Mixed formulation
+The indirect formulation (voltage-driven) and direct formulation (force-driven)
+share the same 8-field network architecture but differ in boundary conditions,
+loss function structure, and default hyperparameters. Each lives in its own
+subpackage with isomorphic interfaces (`load_dataset`, `to_device`, `train`).
+
+## Dependencies
+
+- **Required**: numpy, scipy, pandas, matplotlib, scikit-learn, torch,
+  torchopt, torchsummary, pyDOE, pyyaml, scikit-fem, openpyxl
+- **Optional**: mlflow (experiment tracking), pytest/ruff/mypy (dev),
+  pre-commit (hooks)

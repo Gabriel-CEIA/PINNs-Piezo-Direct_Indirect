@@ -80,6 +80,7 @@ def main():
         device=device,
         model_type=config.arch.model_type,
         hidden_sizes=tuple(config.arch.hidden_sizes),
+        normalize=config.training.normalize_inputs,
     )
     try:
         summary(model, (2,))
@@ -91,9 +92,8 @@ def main():
         suffix=config.training.data_suffix,
         fraction=config.training.data_fraction,
     )
-    tensors = train_mod.to_device(arrays, device, dtype=torch.float64)
-    print("Collocation shapes:",
-          tensors["x_collocation"].shape, tensors["y_collocation"].shape)
+    tensors = train_mod.to_device(arrays, device, dtype=torch.float64,
+                                  normalize=config.training.normalize_inputs)
 
     result = train_mod.train(
         model, tensors,
@@ -109,6 +109,7 @@ def main():
         lr_gamma=config.training.lr_gamma,
         early_stop_patience=config.training.early_stop_patience,
         early_stop_min_delta=config.training.early_stop_min_delta,
+        normalize=config.training.normalize_inputs,
     )
 
     print("Best LBFGS loss:", result["best_loss_lbfgs"])

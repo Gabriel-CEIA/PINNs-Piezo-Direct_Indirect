@@ -32,6 +32,7 @@ dev = [
     "mypy",
     "ipykernel",
     "notebook",
+    "pre-commit>=3.0",
 ]
 
 [project.scripts]

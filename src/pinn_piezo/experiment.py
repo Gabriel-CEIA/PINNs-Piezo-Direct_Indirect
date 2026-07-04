@@ -54,6 +54,7 @@ class TrainingConfig:
     lr_gamma: float = 0.95
     early_stop_patience: int = 200
     early_stop_min_delta: float = 1e-8
+    normalize_inputs: bool = False
 
 
 @dataclass

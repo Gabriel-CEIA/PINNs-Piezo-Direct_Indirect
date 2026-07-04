@@ -9,7 +9,7 @@ import torch
 import torch.nn.init as init
 from torch import nn
 
-from ..config import HEIGHT
+from ..config import HEIGHT, WIDTH
 
 
 def init_weights(m):
@@ -28,15 +28,15 @@ def init_weights_siren(m, omega_0: float = 30.0):
 
 
 class SinActivation(nn.Module):
-    """Wrapper to use ``torch.sin`` inside an ``nn.Sequential``."""
-
     def forward(self, x):
         return torch.sin(x)
 
 
 class FCN(nn.Module):
-    def __init__(self, input_size, hidden_sizes, output_size, activation=nn.Tanh):
+    def __init__(self, input_size, hidden_sizes, output_size,
+                 activation=nn.Tanh, normalize=False):
         super().__init__()
+        self.normalize = normalize
 
         layers = [
             ('input', nn.Linear(input_size, hidden_sizes[0])),
@@ -54,10 +54,12 @@ class FCN(nn.Module):
         outputs = self.net(x)
         u, v, phi = outputs[:, 0:1], outputs[:, 1:2], outputs[:, 2:3]
 
-        x_norm = x[:, 0:1] / 1
-        u_modified = x_norm * u
-        v_modified = x_norm * v
-        phi_modified = (x[:, 1:2] / HEIGHT) * phi
+        x_phys = x[:, 0:1] * (WIDTH if self.normalize else 1.0)
+        y_phys = x[:, 1:2] * (HEIGHT if self.normalize else 1.0)
+
+        u_modified = x_phys * u
+        v_modified = x_phys * v
+        phi_modified = (y_phys / HEIGHT) * phi
 
         return torch.cat([u_modified, v_modified, phi_modified, outputs[:, 3:]],
                          dim=1)
@@ -66,9 +68,9 @@ class FCN(nn.Module):
 def build_default_model(device=None,
                         input_size: int = 2,
                         output_size: int = 8,
-                        hidden_sizes=(100, 250)):
-    """Reproduce the model build sequence used in PINN_pz_v3_directo.ipynb."""
-    model = FCN(input_size, list(hidden_sizes), output_size)
+                        hidden_sizes=(100, 250),
+                        normalize: bool = False):
+    model = FCN(input_size, list(hidden_sizes), output_size, normalize=normalize)
     model.apply(init_weights)
     if device is not None:
         model.to(device)

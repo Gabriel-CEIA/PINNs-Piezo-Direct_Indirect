@@ -9,6 +9,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
+from ..config import HEIGHT, WIDTH
 from .losses import loss_func
 
 
@@ -43,9 +44,21 @@ def load_dataset(data_dir: Path, suffix: str = "_m1_d", fraction: float = 0.75):
     }
 
 
-def to_device(arrays, device, dtype=torch.float32):
-    return {k: tensorize(v, device, dtype=dtype).to(device)
-            for k, v in arrays.items()}
+def to_device(arrays, device, dtype=torch.float32, normalize=False):
+    result = {k: tensorize(v, device, dtype=dtype).to(device)
+              for k, v in arrays.items()}
+    if normalize:
+        result["x_collocation"] = result["x_collocation"] / WIDTH
+        result["y_collocation"] = result["y_collocation"] / HEIGHT
+        result["xy_top"][:, 0:1] = result["xy_top"][:, 0:1] / WIDTH
+        result["xy_top"][:, 1:2] = result["xy_top"][:, 1:2] / HEIGHT
+        result["xy_bottom"][:, 0:1] = result["xy_bottom"][:, 0:1] / WIDTH
+        result["xy_bottom"][:, 1:2] = result["xy_bottom"][:, 1:2] / HEIGHT
+        result["xy_right"][:, 0:1] = result["xy_right"][:, 0:1] / WIDTH
+        result["xy_right"][:, 1:2] = result["xy_right"][:, 1:2] / HEIGHT
+        result["xy_left"][:, 0:1] = result["xy_left"][:, 0:1] / WIDTH
+        result["xy_left"][:, 1:2] = result["xy_left"][:, 1:2] / HEIGHT
+    return result
 
 
 def run_adam(model, tensors, *,
@@ -58,7 +71,8 @@ def run_adam(model, tensors, *,
              lr_step_size: int = 5000,
              lr_gamma: float = 0.95,
              early_stop_patience: int = 200,
-             early_stop_min_delta: float = 1e-8):
+             early_stop_min_delta: float = 1e-8,
+             normalize=False):
     if loss_weights is None:
         loss_weights = {'pde': 1, 'bc': 1}
 
@@ -146,7 +160,8 @@ def run_lbfgs(model, tensors, loss_weights, *,
               lr: float = 0.0001,
               f: int = 200,
               epochs_adam_offset: int = 0,
-              mlflow=None):
+              mlflow=None,
+              normalize=False):
     optimizer = torch.optim.LBFGS(params=model.parameters(), lr=lr)
     loss_list = []
     total_epochs = epochs_adam_offset + epochs
@@ -160,8 +175,9 @@ def run_lbfgs(model, tensors, loss_weights, *,
                 tensors["xy_top"], tensors["xy_bottom"],
                 tensors["xy_right"], tensors["xy_left"],
                 tensors["x_collocation"], tensors["y_collocation"],
-                model, tensors["coefficients"], loss_weights, epoch, f,
-            )
+            model, tensors["coefficients"], loss_weights, epoch, f,
+            normalize=normalize,
+        )
             loss.backward()
             return loss
 
@@ -172,6 +188,7 @@ def run_lbfgs(model, tensors, loss_weights, *,
             tensors["xy_right"], tensors["xy_left"],
             tensors["x_collocation"], tensors["y_collocation"],
             model, tensors["coefficients"], loss_weights, epoch, f,
+            normalize=normalize,
         )
         loss_list.append(loss.item())
 
@@ -199,8 +216,9 @@ def train(model, tensors, *,
           mlflow=None,
           lr_step_size: int = 5000,
           lr_gamma: float = 0.95,
-          early_stop_patience: int = 200,
-          early_stop_min_delta: float = 1e-8):
+           early_stop_patience: int = 200,
+           early_stop_min_delta: float = 1e-8,
+           normalize=False):
     if loss_weights is None:
         loss_weights = {'pde': 1, 'bc': 1}
 
@@ -215,6 +233,7 @@ def train(model, tensors, *,
         lr_gamma=lr_gamma,
         early_stop_patience=early_stop_patience,
         early_stop_min_delta=early_stop_min_delta,
+        normalize=normalize,
     )
 
     loss_list_lbfgs, loss_weights = run_lbfgs(
@@ -222,6 +241,7 @@ def train(model, tensors, *,
         epochs=epochs_lbfgs, lr=lr_lbfgs, f=f,
         epochs_adam_offset=epochs_adam,
         mlflow=mlflow,
+        normalize=normalize,
     )
 
     total_time = time.time() - start_time

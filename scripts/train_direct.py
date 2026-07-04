@@ -76,6 +76,7 @@ def main():
     model = model_mod.build_default_model(
         device=device,
         hidden_sizes=tuple(config.arch.hidden_sizes),
+        normalize=config.training.normalize_inputs,
     )
     try:
         summary(model, (2,))
@@ -87,9 +88,8 @@ def main():
         suffix=config.training.data_suffix,
         fraction=config.training.data_fraction,
     )
-    tensors = train_mod.to_device(arrays, device, dtype=torch.float32)
-    print("Collocation shapes:",
-          tensors["x_collocation"].shape, tensors["y_collocation"].shape)
+    tensors = train_mod.to_device(arrays, device, dtype=torch.float32,
+                                  normalize=config.training.normalize_inputs)
 
     result = train_mod.train(
         model, tensors,
@@ -103,6 +103,7 @@ def main():
         lr_gamma=config.training.lr_gamma,
         early_stop_patience=config.training.early_stop_patience,
         early_stop_min_delta=config.training.early_stop_min_delta,
+        normalize=config.training.normalize_inputs,
     )
 
     save_path = models_dir / "model_PINN_direct.pt"

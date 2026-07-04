@@ -5,7 +5,7 @@ from __future__ import annotations
 import torch
 from torch import nn
 
-from ..config import HEIGHT
+from ..config import HEIGHT, WIDTH
 
 
 loss_fn = nn.MSELoss()
@@ -16,8 +16,11 @@ loss_fn = nn.MSELoss()
 APPLIED_FORCE_Y = 0.1
 
 
-def physics_loss(x, y, model, coefficients):
+def physics_loss(x, y, model, coefficients, normalize=False):
     """PDE residual built from a column-wise Jacobian of the network output."""
+    x_scale = WIDTH if normalize else 1.0
+    y_scale = HEIGHT if normalize else 1.0
+
     x_data = x
     y_data = y
     data = torch.hstack((x_data, y_data))
@@ -36,6 +39,9 @@ def physics_loss(x, y, model, coefficients):
         torch.autograd.grad(y_hat[:, i].sum(), data, create_graph=True)[0]
         for i in range(y_hat.shape[1])
     ]
+    for i in range(len(all_grads)):
+        all_grads[i][:, 0:1] = all_grads[i][:, 0:1] / x_scale
+        all_grads[i][:, 1:2] = all_grads[i][:, 1:2] / y_scale
 
     ux = all_grads[0][:, 0:1]
     uy = all_grads[0][:, 1:2]
@@ -238,7 +244,8 @@ def get_BC_loss(xy_top, xy_bottom, xy_right, xy_left, model):
 def loss_func(xy_top, xy_bottom, xy_right, xy_left,
               x_collocation, y_collocation,
               model, coefficients, loss_weights, n, f,
-              only_BCs: bool = False, adjust: bool = False):
+              only_BCs: bool = False, adjust: bool = False,
+              normalize=False):
     BC_term, stress_loss_term, electric_loss_term = get_BC_loss(
         xy_top, xy_bottom, xy_right, xy_left, model,
     )
@@ -246,6 +253,7 @@ def loss_func(xy_top, xy_bottom, xy_right, xy_left,
      residual_Dx, residual_Dy,
      divergence_sigma1, divergence_sigma2, divergence_D) = physics_loss(
         x_collocation, y_collocation, model, coefficients,
+        normalize=normalize,
     )
 
     if only_BCs:

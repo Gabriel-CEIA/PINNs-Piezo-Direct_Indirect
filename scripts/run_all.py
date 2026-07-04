@@ -136,13 +136,15 @@ def _train_indirect(args, config: ExperimentConfig, run_dir: Path):
         device=device,
         model_type=config.arch.model_type,
         hidden_sizes=tuple(config.arch.hidden_sizes),
+        normalize=config.training.normalize_inputs,
     )
     arrays = ind_train.load_dataset(
         DATA_DIR,
         suffix=config.training.data_suffix,
         fraction=config.training.data_fraction,
     )
-    tensors = ind_train.to_device(arrays, device, dtype=torch.float64)
+    tensors = ind_train.to_device(arrays, device, dtype=torch.float64,
+                                  normalize=config.training.normalize_inputs)
 
     ckpt_adam = run_dir / "checkpoints" / "indirect_ADAM"
     ckpt_lbfgs = run_dir / "checkpoints" / "indirect_LBFGS"
@@ -159,6 +161,7 @@ def _train_indirect(args, config: ExperimentConfig, run_dir: Path):
         lr_gamma=config.training.lr_gamma,
         early_stop_patience=config.training.early_stop_patience,
         early_stop_min_delta=config.training.early_stop_min_delta,
+        normalize=config.training.normalize_inputs,
     )
 
     weights_path = run_dir / "models" / "model_PINN_indirect.pt"
@@ -201,13 +204,15 @@ def _train_direct(args, config: ExperimentConfig, run_dir: Path):
     model = dir_model.build_default_model(
         device=device,
         hidden_sizes=tuple(config.arch.hidden_sizes),
+        normalize=config.training.normalize_inputs,
     )
     arrays = dir_train.load_dataset(
         DATA_DIR,
         suffix=config.training.data_suffix,
         fraction=config.training.data_fraction,
     )
-    tensors = dir_train.to_device(arrays, device, dtype=torch.float32)
+    tensors = dir_train.to_device(arrays, device, dtype=torch.float32,
+                                  normalize=config.training.normalize_inputs)
 
     result = dir_train.train(
         model, tensors,
@@ -217,6 +222,7 @@ def _train_direct(args, config: ExperimentConfig, run_dir: Path):
         lr_gamma=config.training.lr_gamma,
         early_stop_patience=config.training.early_stop_patience,
         early_stop_min_delta=config.training.early_stop_min_delta,
+        normalize=config.training.normalize_inputs,
     )
 
     weights_path = run_dir / "models" / "model_PINN_direct.pt"
